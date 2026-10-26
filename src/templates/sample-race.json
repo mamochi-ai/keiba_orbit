@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "isDemo": true,
+  "race": {
+    "id": "demo-orbit-001",
+    "date": null,
+    "name": "ORBIT記念（架空）",
+    "venue": null,
+    "number": null
+  },
+  "snapshotId": "demo-001",
+  "cutoffAt": null,
+  "mode": "day",
+  "budget": 30000,
+  "horses": [
+    {
+      "id": "demo-a",
+      "number": 4,
+      "name": "A馬（架空）"
+    },
+    {
+      "id": "demo-b",
+      "number": 7,
+      "name": "B馬（架空）"
+    },
+    {
+      "id": "demo-c",
+      "number": 12,
+      "name": "C馬（架空）"
+    }
+  ],
+  "sources": [],
+  "missing": [
+    "実際の出走表",
+    "過去成績",
+    "馬場",
+    "天気",
+    "オッズ"
+  ],
+  "note": "UI確認専用。予想や買い目の根拠には使用不可。"
+}
