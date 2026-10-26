@@ -132,6 +132,15 @@ describe('snapshot checks', () => {
     expect(parseSnapshot({ ...s, sources: [{ ...s.sources[0]!, url: 'http://example.com/a?b=1' }] }).ok).toBe(true);
   });
 
+  it('allows long past-performance text but keeps other items at 8,000 characters', () => {
+    const s = realSnapshot();
+    const item = (len: number) => ({ status: 'ok' as const, sourceId: null, text: 'あ'.repeat(len), error: null });
+    expect(parseSnapshot({ ...s, items: { ...s.items, past: item(60000) } }).ok).toBe(true);
+    expect(parseSnapshot({ ...s, items: { ...s.items, past: item(60001) } }).ok).toBe(false);
+    expect(parseSnapshot({ ...s, items: { ...s.items, track: item(8001) } }).ok).toBe(false);
+    expect(parseSnapshot({ ...s, items: { ...s.items, bogus: item(1) } }).ok).toBe(false);
+  });
+
   it('the demo flow validates end to end', () => {
     const snap = buildSnapshot(demoDraft());
     expect(parseSnapshot(snap).ok).toBe(true);

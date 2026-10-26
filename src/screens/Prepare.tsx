@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { buildSnapshot, itemStatus, parseEntries, parseOdds, validateHome, type Draft, type LineError } from '../domain/draft';
 import { buildAnalysisPrompt } from '../domain/prompt';
-import { ITEM_KEYS, ITEM_LABELS, isSafeHttpUrl, type ItemKey, type RaceSnapshot, type Source } from '../domain/schema';
+import { ITEM_KEYS, ITEM_LABELS, ITEM_TEXT_LIMITS, isSafeHttpUrl, type ItemKey, type RaceSnapshot, type Source } from '../domain/schema';
 import { parseSnapshot } from '../domain/validate';
 import { formatDateJa, formatJst, isoToJstLocal, jstLocalToIso, nowIso } from '../domain/time';
 import { fetchWeather, WEATHER_PROVIDER } from '../data/weather';
@@ -11,7 +11,7 @@ import { CopyButton, DemoBadge, Icon, OpenClaudeLink, SafeLink, StatusBadge } fr
 const HINTS: Record<ItemKey, string> = {
   identity: '開催日・レース名・競馬場・R番号がそろうと「取得済」になります。確認に使った出馬表のURLを記録できます。',
   entries: '1行に「馬番 馬名」。出走取消は行末に「取消」。例：4 オービットスター',
-  past: '過去成績を貼り付け（出典の利用条件を守ってください）。',
+  past: '要約は不要です。JRA公式の出馬表ページ（各馬の近4走が載っています）を全選択してコピーし、そのまま貼り付けてください。整理はClaudeが行います。',
   track: '公式発表の馬場状態など。天気とは別の情報です。',
   weather: '天気予報。馬場状態とは同一視しません。',
   odds: '単勝「4 3.2」、ワイド「4-7 2.1-2.8」を1行ずつ。取得時刻を必ず入力してください。',
@@ -296,8 +296,13 @@ function ItemEditor({ itemKey }: { itemKey: ItemKey }) {
         ) : (
           <label>
             {itemKey === 'entries' ? '出走表（馬番 馬名）' : itemKey === 'odds' ? 'オッズ' : '内容'}
-            <textarea rows={itemKey === 'past' ? 8 : 5} maxLength={8000} value={text} onChange={(e) => setText(e.target.value)} />
+            <textarea rows={itemKey === 'past' ? 10 : 5} maxLength={ITEM_TEXT_LIMITS[itemKey]} value={text} onChange={(e) => setText(e.target.value)} />
           </label>
+        )}
+        {itemKey !== 'identity' && (
+          <p className="hint num">
+            {text.length.toLocaleString('ja-JP')} / {ITEM_TEXT_LIMITS[itemKey].toLocaleString('ja-JP')} 文字
+          </p>
         )}
         {itemKey === 'entries' && draft.horses.length > 0 && (
           <ul className="runner-list" aria-label="反映済みの出走馬">

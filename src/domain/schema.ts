@@ -64,13 +64,31 @@ export const ITEM_LABELS: Record<ItemKey, string> = {
 export const itemStatus = z.enum(['missing', 'ok', 'stale', 'error']);
 export type ItemStatus = z.infer<typeof itemStatus>;
 
-export const dataItemSchema = z.strictObject({
-  status: itemStatus,
-  sourceId: idString.nullable(),
-  text: text(8000).nullable(),
-  error: text(300).nullable().optional(),
-});
+/** Text limit per item. Past performances are pasted as-is (e.g. a whole 出馬表 page), so they get more room. */
+export const ITEM_TEXT_LIMITS: Record<ItemKey, number> = {
+  identity: 8000,
+  entries: 8000,
+  past: 60000,
+  track: 8000,
+  weather: 8000,
+  odds: 8000,
+};
+
+const makeItemSchema = (maxText: number) =>
+  z.strictObject({
+    status: itemStatus,
+    sourceId: idString.nullable(),
+    text: text(maxText).nullable(),
+    error: text(300).nullable().optional(),
+  });
+export const dataItemSchema = makeItemSchema(8000);
 export type DataItem = z.infer<typeof dataItemSchema>;
+const itemsSchema = z.strictObject(
+  Object.fromEntries(ITEM_KEYS.map((k) => [k, makeItemSchema(ITEM_TEXT_LIMITS[k]).optional()])) as Record<
+    ItemKey,
+    z.ZodOptional<typeof dataItemSchema>
+  >,
+);
 
 export const oddsRangeSchema = z
   .strictObject({ min: z.number().min(1).max(99999), max: z.number().min(1).max(99999) })
@@ -104,7 +122,7 @@ export const raceSnapshotSchema = z.strictObject({
   sources: z.array(sourceSchema).max(30),
   missing: z.array(reqText(60)).max(20),
   note: text(500).optional(),
-  items: z.partialRecord(z.enum(ITEM_KEYS), dataItemSchema).optional(),
+  items: itemsSchema.optional(),
   odds: oddsSchema.nullable().optional(),
   references: z.strictObject({ text: text(4000), imageNames: z.array(reqText(120)).max(5) }).optional(),
 });
