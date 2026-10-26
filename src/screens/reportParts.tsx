@@ -24,7 +24,7 @@ export function PayoutLine({ estimate, spent }: { estimate: PayoutEstimate; spen
     case 'fixed':
       return (
         <span className="payout">
-          払戻目安 {formatYen(estimate.payout)}（オッズ{estimate.odds}・{formatJst(estimate.asOf)}時点・未確定）
+          払戻目安 {formatYen(estimate.payout)}（オッズ{estimate.odds.toFixed(1)}・{formatJst(estimate.asOf)}時点・未確定）
           <br />
           この買い目だけ的中した場合の収支 {signedYen(estimate.payout - spent)}
         </span>
@@ -32,7 +32,7 @@ export function PayoutLine({ estimate, spent }: { estimate: PayoutEstimate; spen
     case 'range':
       return (
         <span className="payout">
-          払戻目安 {formatYen(estimate.min)}〜{formatYen(estimate.max)}（オッズ{estimate.oddsMin}〜{estimate.oddsMax}・{formatJst(estimate.asOf)}時点・未確定）
+          払戻目安 {formatYen(estimate.min)}〜{formatYen(estimate.max)}（オッズ{estimate.oddsMin.toFixed(1)}〜{estimate.oddsMax.toFixed(1)}・{formatJst(estimate.asOf)}時点・未確定）
           <br />
           この買い目だけ的中した場合の収支 {signedYen(estimate.min - spent)}〜{signedYen(estimate.max - spent)}
         </span>

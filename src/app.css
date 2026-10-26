@@ -165,3 +165,7 @@ details.subgroup > summary { min-height: 48px; display: flex; align-items: cente
   .nav, .demo-banner .icon, .copy-block, .versions, .skip { display: none; }
   .report-cover { background: white; }
 }
+.card-import { border-top: 2px solid var(--cyan); }
+.card-import .item-label { display: inline-flex; align-items: center; gap: 8px; }
+.card-preview { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.card-preview h3 { margin: 0 0 8px; }

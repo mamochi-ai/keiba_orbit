@@ -7,6 +7,7 @@ import { formatDateJa, formatJst, isoToJstLocal, jstLocalToIso, nowIso } from '.
 import { fetchWeather, WEATHER_PROVIDER } from '../data/weather';
 import { navigate, useApp } from '../state';
 import { CopyButton, DemoBadge, Icon, OpenClaudeLink, SafeLink, StatusBadge } from '../ui/common';
+import { CardImport } from './CardImport';
 
 const HINTS: Record<ItemKey, string> = {
   identity: '開催日・レース名・競馬場・R番号がそろうと「取得済」になります。確認に使った出馬表のURLを記録できます。',
@@ -21,6 +22,8 @@ export function Prepare() {
   const { draft, setDraft, images } = useApp();
   const homeErrors = validateHome(draft);
   const snapshotRef = useRef<RaceSnapshot | null>(null);
+  // Bumped after the 出馬表 import so the item editors re-read the draft.
+  const [rev, setRev] = useState(0);
 
   if (!draft.name) {
     return (
@@ -61,8 +64,9 @@ export function Prepare() {
       </div>
       <div className="layout">
         <section className="stack" aria-label="情報の取得状況">
+          <CardImport onApplied={() => setRev((r) => r + 1)} />
           {ITEM_KEYS.map((k) => (
-            <ItemEditor key={k} itemKey={k} />
+            <ItemEditor key={`${k}-${rev}`} itemKey={k} />
           ))}
         </section>
         <aside className="stack">
@@ -162,6 +166,7 @@ function ItemEditor({ itemKey }: { itemKey: ItemKey }) {
   const [errors, setErrors] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [initiallyOpen] = useState(itemKey === 'entries' && status === 'missing');
 
   function apply() {
     setSaved(false);
@@ -264,7 +269,7 @@ function ItemEditor({ itemKey }: { itemKey: ItemKey }) {
         : null;
 
   return (
-    <details className="panel item" open={itemKey === 'entries' && status === 'missing'}>
+    <details className="panel item" open={initiallyOpen}>
       <summary className="item-head">
         <span className="item-label">{ITEM_LABELS[itemKey]}</span>
         <StatusBadge status={status} />
