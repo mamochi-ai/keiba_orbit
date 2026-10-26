@@ -4,6 +4,7 @@ import { ITEM_TEXT_LIMITS, isSafeHttpUrl, type Source } from '../domain/schema';
 import { formatDateJa, isoToJstLocal, jstLocalToIso, nowIso } from '../domain/time';
 import { useApp } from '../state';
 import { Icon } from '../ui/common';
+import { CopyGuide } from '../ui/CopyGuide';
 
 const PROVIDER = 'JRA公式サイト（出馬表）';
 const MAX_INPUT = 150_000;
@@ -116,10 +117,11 @@ export function CardImport({ onApplied }: { onApplied: () => void }) {
       </summary>
       <div className="item-body">
         <ol className="steps">
-          <li>SafariでJRA公式サイトの出馬表ページを開く（競馬メニュー → 出馬表 → レースを選ぶ）</li>
-          <li>ページの文字を全部選択してコピー（キーボードがあれば ⌘A → ⌘C）</li>
+          <li>SafariでJRA公式サイトの出馬表ページを開く</li>
+          <li>ページの文字を選択してコピー</li>
           <li>下に貼り付けて「読み取る」→ 内容を確認して「反映」</li>
         </ol>
+        <CopyGuide topics={['card']} />
         <label>
           出馬表ページのテキスト
           <textarea rows={6} maxLength={MAX_INPUT} value={text} onChange={(e) => setText(e.target.value)} />

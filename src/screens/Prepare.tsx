@@ -8,6 +8,7 @@ import { fetchWeather, WEATHER_PROVIDER } from '../data/weather';
 import { navigate, useApp } from '../state';
 import { CopyButton, DemoBadge, Icon, OpenClaudeLink, SafeLink, StatusBadge } from '../ui/common';
 import { CardImport } from './CardImport';
+import { CopyGuide } from '../ui/CopyGuide';
 
 const HINTS: Record<ItemKey, string> = {
   identity: '開催日・レース名・競馬場・R番号がそろうと「取得済」になります。確認に使った出馬表のURLを記録できます。',
@@ -139,6 +140,7 @@ export function Prepare() {
               </p>
             )}
             <p className="hint">ClaudeへのログインやClaude画面への自動入力は行いません。</p>
+            <CopyGuide topics={['claude']} />
           </section>
         </aside>
       </div>
@@ -279,6 +281,8 @@ function ItemEditor({ itemKey }: { itemKey: ItemKey }) {
       </summary>
       <div className="item-body">
         <p className="hint">{HINTS[itemKey]}</p>
+        {itemKey === 'track' && <CopyGuide topics={['track']} />}
+        {itemKey === 'odds' && <CopyGuide topics={['wide']} />}
         {item.status === 'error' && (
           <div className="error-box" role="alert">
             <p>取得エラー：{item.error}</p>

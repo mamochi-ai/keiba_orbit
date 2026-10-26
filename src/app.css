@@ -169,3 +169,9 @@ details.subgroup > summary { min-height: 48px; display: flex; align-items: cente
 .card-import .item-label { display: inline-flex; align-items: center; gap: 8px; }
 .card-preview { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
 .card-preview h3 { margin: 0 0 8px; }
+.guide { display: grid; gap: 0; }
+.guide .subgroup { margin-top: 12px; }
+.guide-steps { padding-left: 1.4em; margin: 6px 0 10px; }
+.guide-steps li { padding: 4px 0; }
+.guide-steps ul { padding-left: 1.1em; margin: 6px 0; }
+kbd { font-family: var(--mono); font-size: 14px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 6px; background: var(--panel2); }

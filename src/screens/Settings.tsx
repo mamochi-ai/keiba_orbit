@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { emptyDraft } from '../domain/draft';
 import { clearAll } from '../storage/db';
 import { useApp } from '../state';
+import { CopyGuide } from '../ui/CopyGuide';
 
 const SOURCES: { item: string; state: string; how: string }[] = [
   { item: 'レース候補・出走表', state: '自動取得は未接続', how: '出馬表などを見て手入力・貼り付け' },
@@ -37,6 +38,15 @@ export function SettingsScreen() {
       </div>
       <div className="layout">
         <div className="stack">
+          <section className="panel" aria-labelledby="howto">
+            <h2 id="howto" className="h3">
+              データの集め方（手作業でのコピー手順）
+            </h2>
+            <p className="muted">
+              アプリはJRAのサイトに自動でアクセスしません。下の手順で、ページの文字をコピーして貼り付けてください。同じ手順は分析準備の各項目にも載っています。
+            </p>
+            <CopyGuide topics={['card', 'track', 'wide', 'claude']} />
+          </section>
           <section className="panel" aria-labelledby="ds">
             <h2 id="ds" className="h3">
               データの取得元
