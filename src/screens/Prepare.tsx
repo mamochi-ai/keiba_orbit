@@ -118,11 +118,13 @@ export function Prepare() {
                 <div className="step-body">
                   <label>
                     情報締切（JST。この時刻より後の情報は使わない）
-                    <input
-                      type="datetime-local"
-                      value={draft.cutoffLocal}
-                      onChange={(e) => setDraft((d) => ({ ...d, cutoffLocal: e.target.value, confirmed: false }))}
-                    />
+                    <span className="date-wrap">
+                      <input
+                        type="datetime-local"
+                        value={draft.cutoffLocal}
+                        onChange={(e) => setDraft((d) => ({ ...d, cutoffLocal: e.target.value, confirmed: false }))}
+                      />
+                    </span>
                   </label>
                   <label className="check">
                     <input type="checkbox" checked={draft.confirmed} onChange={(e) => setDraft((d) => ({ ...d, confirmed: e.target.checked }))} />
@@ -387,11 +389,15 @@ function ItemEditor({ itemKey }: { itemKey: ItemKey }) {
             </label>
             <label>
               取得日時（JST）
-              <input type="datetime-local" value={fetchedLocal} onChange={(e) => setFetchedLocal(e.target.value)} />
+              <span className="date-wrap">
+                <input type="datetime-local" value={fetchedLocal} onChange={(e) => setFetchedLocal(e.target.value)} />
+              </span>
             </label>
             <label>
               対象時点（JST）
-              <input type="datetime-local" value={asOfLocal} onChange={(e) => setAsOfLocal(e.target.value)} />
+              <span className="date-wrap">
+                <input type="datetime-local" value={asOfLocal} onChange={(e) => setAsOfLocal(e.target.value)} />
+              </span>
             </label>
           </div>
           {source && (
