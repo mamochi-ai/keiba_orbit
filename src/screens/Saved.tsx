@@ -71,20 +71,20 @@ export function Saved() {
   return (
     <>
       <div className="page-head">
-        <span className="eyebrow">04 / ARCHIVE</span>
+        <span className="tag">Archive</span>
         <h1 tabIndex={-1} className="page-title">
           保存した分析
         </h1>
         <p className="muted">
-          分析はこの端末のブラウザ内（IndexedDB）に保存されます。ブラウザのデータ削除や長期間の未使用で消えることがあるため、JSONで書き出して「ファイル」などに保管してください。
+          分析はこの端末のブラウザ内に保存されます。ブラウザのデータ削除や長期間の未使用で消えることがあるため、ときどき書き出して「ファイル」などに保管してください。
         </p>
       </div>
       <div className="row">
         <button type="button" className="btn" onClick={doExport} disabled={!items || items.length === 0}>
-          <Icon name="report" /> JSONで書き出す
+          <Icon name="report" /> データを書き出す
         </button>
         <label className="btn file-btn">
-          <Icon name="paste" /> JSONを読み込む
+          <Icon name="paste" /> データを読み込む
           <input type="file" accept="application/json,.json" onChange={doImport} className="visually-hidden" />
         </label>
       </div>
@@ -101,37 +101,40 @@ export function Saved() {
         </p>
       )}
 
-      <section className="panel section" aria-labelledby="pnl">
-        <span className="eyebrow">RESULT HISTORY</span>
-        <h2 id="pnl" className="h3">
-          収支履歴（実データのみ・不的中を含む）
-        </h2>
+      <section className="sec" aria-labelledby="pnl">
+        <div className="sec-head">
+          <span className="tag">Ledger</span>
+          <h2 id="pnl" className="sec-title">
+            収支履歴
+          </h2>
+          <span className="sec-note">実データのみ・不的中を含む</span>
+        </div>
         {settled.length === 0 ? (
           <p className="muted">記録された収支はまだありません。各分析の「レース後の記録」から入力します。</p>
         ) : (
-          <>
-            <div className="listrow">
-              <span>記録したレース</span>
-              <b className="num">{settled.length}件</b>
+          <div className="ledger metrics">
+            <div className="metric-box">
+              <span className="k">記録したレース</span>
+              <span className="v">{settled.length}件</span>
             </div>
-            <div className="listrow">
-              <span>購入額の合計（仮想）</span>
-              <b className="num">{formatYen(totalSpent)}</b>
+            <div className="metric-box">
+              <span className="k">購入額（仮想）</span>
+              <span className="v">{formatYen(totalSpent)}</span>
             </div>
-            <div className="listrow">
-              <span>払戻の合計</span>
-              <b className="num">{formatYen(totalPayout)}</b>
+            <div className="metric-box">
+              <span className="k">払戻</span>
+              <span className="v">{formatYen(totalPayout)}</span>
             </div>
-            <div className="listrow">
-              <span>収支</span>
-              <b className="num">{signedYen(totalPayout - totalSpent)}</b>
+            <div className="metric-box">
+              <span className="k">収支</span>
+              <span className="v">{signedYen(totalPayout - totalSpent)}</span>
             </div>
-          </>
+          </div>
         )}
         <p className="hint">架空デモの記録は収支履歴に含めません。</p>
       </section>
 
-      <section className="section" aria-label="保存した分析の一覧">
+      <section className="sec" aria-label="保存した分析の一覧">
         {items === null ? (
           <p className="row">
             <span className="spinner" aria-hidden="true" /> 読み込み中
@@ -172,7 +175,7 @@ function SavedRow({ a, settlement, onChanged }: { a: SavedAnalysis; settlement?:
   }
 
   return (
-    <li className="panel saved-item">
+    <li className="saved-item">
       <div className="saved-head">
         <div>
           <p className="saved-title">
@@ -188,10 +191,10 @@ function SavedRow({ a, settlement, onChanged }: { a: SavedAnalysis; settlement?:
           <span className="badge">使用 {formatYen(spent)}</span>
         </div>
       </div>
-      <details className="subgroup">
+      <details className="subgroup mt">
         <summary>レース後の記録{settlement ? `（記録済：${signedYen(settlement.payout - spent)}）` : ''}</summary>
         <p className="hint">予想時点の内容は変更されません。払戻額は実際の結果から入力してください。</p>
-        <div className="formgrid">
+        <div className="grid-2">
           <label>
             払戻額の合計（円・不的中は0）
             <input type="number" inputMode="numeric" min={0} step={10} value={payout} onChange={(e) => setPayout(e.target.value)} />

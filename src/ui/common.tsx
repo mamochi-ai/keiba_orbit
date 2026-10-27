@@ -10,15 +10,24 @@ export function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   return <img src={`assets/icons/${name}.svg`} alt="" aria-hidden="true" width={size} height={size} className="icon" />;
 }
 
-const STATUS_TEXT: Record<ItemStatus, string> = { ok: '取得済', missing: '未取得', stale: '古い情報', error: '取得エラー' };
-const STATUS_CLASS: Record<ItemStatus, string> = { ok: 'ok', missing: '', stale: 'warn', error: 'error' };
+export const STATUS_TEXT: Record<ItemStatus, string> = { ok: '取得済', missing: '未取得', stale: '古い情報', error: '取得エラー' };
 
+/** Status = shape + text (never colour alone): ● 取得済 / ○ 未取得 / ◆ 古い情報 / ■ 取得エラー. */
 export function StatusBadge({ status }: { status: ItemStatus }) {
   return (
-    <span className={`badge ${STATUS_CLASS[status]}`}>
-      {status === 'ok' ? '● ' : status === 'missing' ? '○ ' : status === 'stale' ? '△ ' : '× '}
+    <span className={`state ${status}`}>
+      <span className="dot" aria-hidden="true" />
       {STATUS_TEXT[status]}
     </span>
+  );
+}
+
+/** The generated orbit background. Used only on the home visual and the report cover. */
+export function OrbitVisual({ className = '' }: { className?: string }) {
+  return (
+    <div className={`orbit-visual ${className}`} style={{ backgroundImage: 'url(assets/orbit-hero.png)' }} aria-hidden="true">
+      <span className="orbit-ring" />
+    </div>
   );
 }
 
@@ -122,9 +131,9 @@ export function CopyButton({
         </p>
       )}
       <p className="sr-status" role="status" aria-live="polite">
-        {state === 'done' ? 'コピーしました。Claudeに貼り付けてください。' : ''}
+        {state === 'done' ? 'コピーしました' : ''}
       </p>
-      {state === 'done' && <p className="ok-text">✓ コピーしました。Claudeの入力欄に貼り付けてください。</p>}
+      {state === 'done' && <p className="ok-text" aria-hidden="true">✓ コピーしました</p>}
       {err && <p className="error-text" role="alert">{err}</p>}
       {fallback !== null && (
         <div className="manual-copy" role="alert">

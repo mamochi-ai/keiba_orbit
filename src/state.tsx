@@ -30,6 +30,9 @@ interface AppState {
   reloadImages: () => Promise<void>;
   settings: Settings;
   setSettings: (s: Settings) => void;
+  /** Set by the report screen while it shows a saved demo analysis (drives the demo strip). */
+  reportIsDemo: boolean;
+  setReportIsDemo: (v: boolean) => void;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -41,6 +44,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [images, setImages] = useState<StoredImage[]>([]);
   const [settings, setSettingsState] = useState<Settings>(readSettings);
   const saveTimer = useRef<number | undefined>(undefined);
+  const [reportIsDemo, setReportIsDemo] = useState(false);
 
   const reloadImages = useCallback(async () => {
     try {
@@ -89,7 +93,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <Ctx.Provider value={{ draft, draftLoaded, storageError, setDraft, images, reloadImages, settings, setSettings }}>
+    <Ctx.Provider value={{ draft, draftLoaded, storageError, setDraft, images, reloadImages, settings, setSettings, reportIsDemo, setReportIsDemo }}>
       {children}
     </Ctx.Provider>
   );
