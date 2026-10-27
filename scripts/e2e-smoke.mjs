@@ -38,27 +38,44 @@ await page.waitForSelector('h1');
 await overflow('home');
 
 // Home validation: empty required fields
+const prepBtn = page.getByRole('button', { name: '分析を準備' });
+check('home: 分析を準備 disabled with one-line reason (name)', (await prepBtn.isDisabled()) && (await page.locator('#cta-reason').innerText()).includes('レース名'));
+await page.locator('#home-name').fill('X');
 await page.locator('#home-date').fill('');
-await page.getByRole('button', { name: '分析を準備' }).click();
-check('home: required field errors shown (date, race name)', (await page.locator('.field-error').count()) >= 2);
+check('home: reason switches to date', (await page.locator('#cta-reason').innerText()).includes('開催日'));
+await page.locator('#home-name').fill('');
+await page.locator('#home-date').fill('2026-11-01');
 
 // Small text check: body text >= 16px
 const bodySize = await page.evaluate(() => getComputedStyle(document.body).fontSize);
 check('body font-size is 16px', bodySize === '16px', bodySize);
 
-// Tap targets: all buttons / nav links >= 48px tall
-const small = await page.evaluate(() =>
-  [...document.querySelectorAll('button, .btn, .nav a, input:not([type=checkbox]):not([type=file]), select')]
-    .filter((el) => el.offsetParent !== null)
-    .filter((el) => el.getBoundingClientRect().height < 47.5)
-    .map((el) => el.outerHTML.slice(0, 80)),
-);
-check('home: tap targets >= 48px', small.length === 0, small.join(' | '));
+// Tap targets: everything >= 44px, primary actions and inputs >= 48px
+const tapIssues = async () => page.evaluate(() => {
+  const vis = (el) => el.offsetParent !== null || getComputedStyle(el).position === 'fixed';
+  const all = [...document.querySelectorAll('button, .btn, a, input:not([type=checkbox]):not([type=file]), select, summary')].filter(vis);
+  const small = all.filter((el) => el.getBoundingClientRect().height < 43.5 && !el.closest('footer') && !el.matches('.skip'));
+  const main = [...document.querySelectorAll('.btn.primary, input:not([type=checkbox]):not([type=file]), select')].filter(vis).filter((el) => el.getBoundingClientRect().height < 47.5);
+  return [...small, ...main].map((el) => el.outerHTML.slice(0, 70));
+});
+check('home: tap targets (44px / primary 48px)', (await tapIssues()).length === 0, (await tapIssues()).join(' | '));
+await page.setViewportSize({ width: 390, height: 844 });
+check('390: bottom nav shown, top nav hidden', (await page.locator('.bottomnav').isVisible()) && !(await page.locator('.topnav').isVisible()));
+check('390: tap targets', (await tapIssues()).length === 0, (await tapIssues()).join(' | '));
+await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+await page.waitForTimeout(100);
+const covered = await page.evaluate(() => document.querySelector('.app-foot').getBoundingClientRect().bottom - document.querySelector('.bottomnav').getBoundingClientRect().top);
+check('390: bottom nav does not cover the end of the page', covered <= 0, `overlap=${covered}`);
+const inputFont = await page.evaluate(() => getComputedStyle(document.querySelector('#home-name')).fontSize);
+check('390: inputs are 16px (no iOS zoom)', inputFont === '16px', inputFont);
+await page.setViewportSize({ width: 1024, height: 900 });
+check('1024: top nav shown, bottom nav hidden', (await page.locator('.topnav').isVisible()) && !(await page.locator('.bottomnav').isVisible()));
+await page.setViewportSize({ width: 1366, height: 900 });
 
 // Demo flow
 await page.getByRole('button', { name: '架空デモで試す' }).click();
 await page.waitForURL(/#\/prepare/);
-check('demo banner visible on prepare', await page.locator('.demo-banner').isVisible());
+check('demo strip visible on prepare (once)', (await page.locator('.demo-strip').isVisible()) && (await page.getByText('実在レースの予想ではありません').count()) === 1);
 await overflow('prepare');
 
 const copyBtn = page.getByRole('button', { name: '分析用コピー' });
@@ -101,21 +118,27 @@ await overflow('confirm');
 await page.getByRole('button', { name: 'この内容で保存してレポートを表示' }).click();
 await page.waitForURL(/#\/report\//);
 await page.waitForSelector('#report-title');
-check('report: demo labels', (await page.locator('.report-cover').innerText()).includes('架空レース'));
+check('report: demo strip shown', (await page.locator('.demo-strip').innerText()).includes('架空デモ'));
+check('report: conclusion in cover', (await page.locator('.conclusion').innerText()).includes('良馬場ならA馬'));
+check('report: candidates with roles', (await page.locator('.cand .role').first().innerText()) === '中心候補');
 await overflow('report');
 
 // Scenario switching keeps the budget unchanged
-const budgetBefore = await page.locator('#budget-title').locator('..').innerText();
+const budgetBefore = await page.locator('.r-side').innerText();
 await page.getByRole('tab', { name: /馬場が悪化/ }).click();
-const firstWet = await page.locator('.ranking .horse h3').first().innerText();
+const firstWet = await page.locator('.ranking .rank-name').first().innerText();
 check('report: wet scenario reorders (B first)', firstWet.includes('B馬'), firstWet);
+check('report: changed horses show up/down with reason', (await page.locator('.ranking .delta.up').count()) === 1 && (await page.locator('.ranking .rank-why').count()) === 2 && (await page.locator('.change-reason').innerText()).includes('評価順が変わった理由'));
+await page.getByRole('tab', { name: /基本の想定/ }).focus();
+await page.keyboard.press('ArrowRight');
+check('report: arrow keys move between condition tabs', (await page.getByRole('tab', { name: /馬場が悪化/ }).getAttribute('aria-selected')) === 'true');
 await page.getByRole('tab', { name: /速いペース/ }).click();
 check('report: unanalysed scenario shows empty state + re-analyse', await page.getByRole('button', { name: '情報を補って再分析' }).isVisible());
-const budgetAfter = await page.locator('#budget-title').locator('..').innerText();
+const budgetAfter = await page.locator('.r-side').innerText();
 check('report: budget unchanged by scenario switch', budgetBefore === budgetAfter);
 
 // Sticky side column only on desktop pointer
-const pos = await page.evaluate(() => getComputedStyle(document.querySelector('.report-layout > .side')).position);
+const pos = await page.evaluate(() => getComputedStyle(document.querySelector('.r-side')).position);
 check('report: side column sticky on desktop', pos === 'sticky', pos);
 
 // Note copy — footer must be the very end
@@ -191,7 +214,7 @@ check('card import: preview lists 10 horses', (await cardPanel.locator('.runner-
 check('card import: header mismatch warned', (await cardPanel.locator('.notice').first().innerText()).includes('見出しが違います'));
 await cardPanel.getByRole('button', { name: 'この内容で反映' }).click();
 await cardPanel.locator('text=を反映しました').waitFor();
-const badgeOf = (label) => r.locator('details.item:not(.card-import)', { has: r.locator('.item-label', { hasText: new RegExp(`^${label}$`) }) }).locator('summary.item-head .badge');
+const badgeOf = (label) => r.locator('details.item:not(.card-import)', { has: r.locator('.item-label', { hasText: new RegExp(`^${label}$`) }) }).locator('summary.item-head .state');
 check('card import: entries / odds / past obtained', (await badgeOf('出走表').innerText()).includes('取得済') && (await badgeOf('オッズ').innerText()).includes('取得済') && (await badgeOf('過去成績').innerText()).includes('取得済'));
 const odds = r.locator('details.item:not(.card-import)', { has: r.locator('.item-label', { hasText: /^オッズ$/ }) });
 await odds.locator('summary.item-head').click();
@@ -203,7 +226,13 @@ await odds.getByRole('button', { name: 'この内容で反映' }).click();
 check('prepare: dangerous URL rejected', (await odds.locator('.error-box').innerText()).includes('http://'));
 await odds.getByLabel('元URL（http/https）').fill('https://example.com/odds');
 await odds.getByRole('button', { name: 'この内容で反映' }).click();
-check('prepare: odds marked as obtained', (await odds.locator('summary.item-head .badge').innerText()).includes('取得済'));
+check('prepare: odds marked as obtained', (await odds.locator('summary.item-head .state').innerText()).includes('取得済'));
+const weather = r.locator('details.item:not(.card-import)', { has: r.locator('.item-label', { hasText: /^天気$/ }) });
+await weather.locator('summary.item-head').click();
+await weather.getByRole('button', { name: /天気予報を取得/ }).click();
+await weather.locator('summary.item-head .state').filter({ hasText: /取得済|取得エラー/ }).waitFor({ timeout: 20000 });
+const wState = await weather.locator('summary.item-head .state').innerText();
+check('weather: shows 取得済 or 取得エラー (never fake)', /取得済|取得エラー/.test(wState) && (wState.includes('取得済') || (await weather.locator('.error-box').count()) > 0), wState);
 await r.getByLabel('分析対象と情報締切を確認しました').check();
 await r.getByRole('button', { name: '分析用コピー' }).click();
 await r.waitForSelector('text=コピーしました');
@@ -224,13 +253,34 @@ await r.getByLabel(/Claudeの応答/).fill('```json\n' + JSON.stringify(resp) + 
 await r.getByRole('button', { name: '読み込んで確認' }).click();
 await r.getByRole('button', { name: 'この内容で保存してレポートを表示' }).click();
 await r.waitForSelector('#report-title');
-const budgetText = await r.locator('#budget-title').locator('..').innerText();
+const budgetText = await r.locator('.r-side').innerText();
 check('real report: win payout estimate ¥3,200', budgetText.includes('¥3,200'));
 check('real report: wide payout range ¥4,200〜¥5,600', budgetText.includes('¥4,200〜¥5,600'));
 check('real report: profit shown separately', budgetText.includes('この買い目だけ的中した場合の収支'));
-check('real report: HTML in summary is text', (await r.locator('.report-cover script').count()) === 0 && (await r.locator('.report-cover').innerText()).includes('<script>'));
-check('real report: no demo banner', (await r.locator('.demo-banner').count()) === 0);
+check('real report: HTML in summary is text', (await r.locator('.cover script').count()) === 0 && (await r.locator('.cover').innerText()).includes('<script>'));
+check('real report: no demo strip', (await r.locator('.demo-strip').count()) === 0);
+check('real report: confirmed course/R shown', (await r.locator('.cover-meta').innerText()).includes('東京') && (await r.locator('.cover-meta').innerText()).includes('11R'));
 await real.close();
+
+// Empty states in a fresh browser profile
+const fresh = await browser.newContext({ viewport: { width: 390, height: 844 } });
+const f = await fresh.newPage();
+const seen = (t) => f.getByText(t).first().waitFor({ timeout: 5000 }).then(() => true, () => false);
+await f.goto(base + '#/saved');
+check('empty: saved list shows empty state', await seen('保存した分析はまだありません。'));
+await f.goto(base + '#/prepare');
+check('empty: prep without race shows empty state', await seen('まだレースが選ばれていません。'));
+await f.goto(base + '#/paste');
+check('empty: paste without copy shows empty state', await seen('まだ分析用コピーをしていません。'));
+await f.goto(base + '#/report/a-missing');
+check('empty: unknown report shows not-found', await seen('レポートが見つかりません'));
+if (shots) {
+  await f.goto(base);
+  await f.waitForSelector('button.btn');
+  await f.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await f.screenshot({ path: `${shots}/home-390-bottom-viewport.png` });
+}
+await fresh.close();
 
 check('no console errors', consoleErrors.length === 0, consoleErrors.join(' | '));
 await browser.close();

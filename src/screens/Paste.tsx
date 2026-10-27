@@ -7,7 +7,7 @@ import { checkResponse, horseLabel, type ResponseCheck } from '../domain/validat
 import { nowIso } from '../domain/time';
 import { addAnalysis, nextVersion } from '../storage/db';
 import { navigate, useApp } from '../state';
-import { DemoBadge, Icon } from '../ui/common';
+import { EmptyState, Icon } from '../ui/common';
 import { betLabel, PayoutLine, STATUS_LABELS } from './reportParts';
 
 export function Paste() {
@@ -21,12 +21,18 @@ export function Paste() {
 
   if (!snapshot) {
     return (
-      <section className="panel section">
-        <h1 tabIndex={-1}>結果を貼り付け</h1>
-        <p>先に分析準備画面で「分析用コピー」をしてください。貼り付けた結果は、そのコピーの版と照合します。</p>
-        <a className="btn primary" href="#/prepare">
-          分析準備へ
-        </a>
+      <section className="sec first">
+        <div className="page-head">
+          <h1 tabIndex={-1} className="page-title">
+            結果を貼り付け
+          </h1>
+        </div>
+        <EmptyState title="まだ分析用コピーをしていません。">
+          <p className="muted">貼り付けた結果は、コピーした版と照合します。</p>
+          <a className="btn primary" href="#/prepare">
+            分析準備へ
+          </a>
+        </EmptyState>
       </section>
     );
   }
@@ -78,15 +84,15 @@ export function Paste() {
   return (
     <>
       <div className="page-head">
-        <span className="eyebrow">02 / PASTE RESULT</span>
+        <span className="tag">Step 3</span>
         <h1 tabIndex={-1} className="page-title">
-          結果を貼り付け {snapshot.isDemo && <DemoBadge />}
+          結果を貼り付け
         </h1>
         <p className="muted">
           照合先：{snapshot.race.name}／版 <code>{snapshot.snapshotId}</code>
         </p>
       </div>
-      <section className="panel">
+      <section className="sec first">
         <label>
           Claudeの応答（JSONのみ、または ```json のコードフェンス1個）
           <textarea
@@ -125,9 +131,13 @@ export function Paste() {
       </section>
 
       {check && (
-        <section className="panel section" aria-labelledby="confirm">
-          <span className="eyebrow">CONFIRM</span>
-          <h2 id="confirm">取り込み内容の確認</h2>
+        <section className="sec confirm" aria-labelledby="confirm">
+          <div className="sec-head">
+            <span className="tag">Confirm</span>
+            <h2 id="confirm" className="sec-title">
+              取り込み内容の確認
+            </h2>
+          </div>
           {errors.length > 0 ? (
             <div className="error-box" role="alert">
               <p>
@@ -140,7 +150,7 @@ export function Paste() {
               </ul>
             </div>
           ) : (
-            <p className="ok-text">形式と照合のチェックを通過しました。内容を確認して保存してください。結果の正しさは保証されません。</p>
+            <p className="ok-text">形式と照合のチェックを通過しました。予想の正しさは検証していません。内容を確認して保存してください。</p>
           )}
           {warnings.length > 0 && (
             <div className="notice">
@@ -155,13 +165,13 @@ export function Paste() {
             </div>
           )}
           {res && check.ok && (
-            <div className="stack mt">
+            <div className="confirm">
               <div>
                 <span className="badge">{STATUS_LABELS[res.status]}</span>
-                <p className="lead">{res.summary || '（結論の記載なし）'}</p>
+                <p className="conclusion-text">{res.summary || '（結論の記載なし）'}</p>
               </div>
               <div>
-                <h3>条件別</h3>
+                <h3 className="subhead">条件別</h3>
                 <ul className="plain">
                   {res.scenarios.map((s) => (
                     <li key={s.id}>
@@ -172,7 +182,7 @@ export function Paste() {
                 </ul>
               </div>
               <div>
-                <h3>配分（裁量的な仮説）</h3>
+                <h3 className="subhead">配分（裁量的な仮説）</h3>
                 {res.bets.length === 0 ? (
                   <p className="muted">配分は空です。</p>
                 ) : (

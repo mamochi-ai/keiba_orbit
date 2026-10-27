@@ -2,20 +2,20 @@ import { useEffect, useState } from 'react';
 import { draftFromSnapshot } from '../domain/draft';
 import { buildNotePrompt } from '../domain/prompt';
 import { stripOuterFence } from '../domain/parse';
-import { SCENARIO_IDS, SCENARIO_LABELS, type SavedAnalysis, type ScenarioId } from '../domain/schema';
-import { checkResponse, horseLabel } from '../domain/validate';
+import type { SavedAnalysis, ScenarioId } from '../domain/schema';
+import { checkResponse } from '../domain/validate';
 import { formatDateJa, formatJst, nowIso } from '../domain/time';
 import { getAnalysis, listAnalyses, setNoteArticle } from '../storage/db';
 import { navigate, useApp } from '../state';
-import { CopyButton, DemoBadge, EmptyState, Icon, OpenClaudeLink, SafeLink } from '../ui/common';
+import { CopyButton, EmptyState, Icon, OpenClaudeLink, OrbitVisual, SafeLink } from '../ui/common';
 import { SafeMarkdown } from '../ui/SafeMarkdown';
-import { BudgetPanel, ScenarioRanking, STATUS_LABELS } from './reportParts';
+import { BudgetPanel, Candidates, ScenarioCompare, STATUS_LABELS } from './reportParts';
 
 export function Report({ id }: { id: string }) {
   const [rec, setRec] = useState<SavedAnalysis | null | undefined>(undefined);
   const [siblings, setSiblings] = useState<SavedAnalysis[]>([]);
   const [scenario, setScenario] = useState<ScenarioId>('base');
-  const { draft, setDraft } = useApp();
+  const { draft, setDraft, setReportIsDemo } = useApp();
 
   useEffect(() => {
     let alive = true;
@@ -35,9 +35,17 @@ export function Report({ id }: { id: string }) {
     };
   }, [id]);
 
+  useEffect(() => {
+    setReportIsDemo(Boolean(rec?.isDemo));
+    return () => setReportIsDemo(false);
+  }, [rec?.isDemo, setReportIsDemo]);
+
   if (rec === undefined) {
     return (
-      <section className="panel section" aria-busy="true">
+      <section className="sec first" aria-busy="true">
+        <h1 tabIndex={-1} className="visually-hidden">
+          レポート
+        </h1>
         <p className="row">
           <span className="spinner" aria-hidden="true" /> 保存した分析を読み込み中
         </p>
@@ -46,8 +54,12 @@ export function Report({ id }: { id: string }) {
   }
   if (rec === null) {
     return (
-      <section className="panel section">
-        <h1 tabIndex={-1}>レポートが見つかりません</h1>
+      <section className="sec first">
+        <div className="page-head">
+          <h1 tabIndex={-1} className="page-title">
+            レポートが見つかりません
+          </h1>
+        </div>
         <EmptyState title="この端末に保存されていないか、削除されています。">
           <a className="btn" href="#/saved">
             保存した分析へ
@@ -59,61 +71,40 @@ export function Report({ id }: { id: string }) {
 
   const { snapshot, response } = rec;
   const recheck = checkResponse(snapshot, response);
-  const sc = response.scenarios.find((s) => s.id === scenario);
-  const parent = rec.parentId ? siblings.find((s) => s.id === rec.parentId) : undefined;
+  const race = snapshot.race;
 
   function reanalyze() {
-    if (draft.name && draft.copied?.snapshotId !== snapshot.snapshotId && !window.confirm('作業中の下書きを、この分析の入力内容で置き換えて再分析しますか？')) return;
+    if (draft.name && draft.copied?.snapshotId !== snapshot.snapshotId && !window.confirm('作業中の内容を、この分析の入力内容で置き換えて再分析しますか？')) return;
     setDraft({ ...draftFromSnapshot(snapshot, rec!.id) });
     navigate('/prepare');
   }
 
   return (
     <>
-      <section className="report-cover" aria-labelledby="report-title">
-        <div className="cover-grid" style={{ backgroundImage: 'url(assets/report-grid.svg)' }} aria-hidden="true" />
-        <span className="eyebrow">03 / RACE REPORT</span>
-        <h1 id="report-title" tabIndex={-1} className="cover-title">
-          {snapshot.race.name} {rec.isDemo && <span className="badge warn">架空レース</span>}
-        </h1>
-        <p className="muted">
-          {formatDateJa(snapshot.race.date)}　{snapshot.race.venue ?? '競馬場未確認'} {snapshot.race.number ? `${snapshot.race.number}R` : ''}　／　版{rec.version}（{rec.kind === 'original' ? '元レポート' : '再分析版'}）・{formatJst(rec.createdAt)} 作成
-        </p>
-        <p className="lead">{response.summary || '（結論の記載なし）'}</p>
-        <div className="row">
-          <span className="badge">{STATUS_LABELS[response.status]}</span>
-          <span className="badge">Claude通常チャットの応答をアプリで形式チェック済（内容の正しさは未検証）</span>
-          {rec.isDemo && <span className="badge warn">表示見本 / 架空デモ / 購入判断に使用不可</span>}
+      <header className="cover" aria-labelledby="report-title">
+        <div>
+          <span className="tag">Race report</span>
+          <h1 id="report-title" tabIndex={-1} className="cover-race">
+            {race.name}
+          </h1>
+          <p className="cover-meta">
+            <span className={race.date ? '' : 'unconfirmed'}>{race.date ? formatDateJa(race.date) : rec.isDemo ? '日付なし（架空）' : '開催日未確認'}</span>
+            <span className={race.venue ? '' : 'unconfirmed'}>{race.venue ?? '競馬場未確認'}</span>
+            <span className={race.number ? 'num' : 'unconfirmed'}>{race.number ? `${race.number}R` : 'R番号未確認'}</span>
+          </p>
+          <div className="conclusion">
+            <span className="tag">結論</span>
+            <p className="conclusion-text">{response.summary || '結論の記載はありません。'}</p>
+            <span className={`badge ${response.status === 'ready' ? 'ok' : 'warn'}`}>{STATUS_LABELS[response.status]}</span>
+          </div>
         </div>
-      </section>
-
-      {(parent || siblings.length > 1) && (
-        <nav className="panel versions" aria-label="この分析の版">
-          <span className="eyebrow">VERSIONS</span>
-          <ul className="row plain">
-            {siblings.map((s) => (
-              <li key={s.id}>
-                {s.id === rec.id ? (
-                  <span className="badge ok" aria-current="page">
-                    版{s.version}（表示中）
-                  </span>
-                ) : (
-                  <a className="btn ghost" href={`#/report/${s.id}`}>
-                    版{s.version}
-                    {s.kind === 'original' ? '（元）' : ''}
-                  </a>
-                )}
-              </li>
-            ))}
-          </ul>
-          {parent && <p className="hint">この版は「版{parent.version}」をもとにした再分析です。元レポートは変更されていません。</p>}
-        </nav>
-      )}
+        <OrbitVisual />
+      </header>
 
       {!recheck.ok && (
-        <div className="error-box section" role="alert">
+        <div className="error-box" role="alert">
           <p>
-            <b>保存データの再チェックで問題が見つかりました：</b>
+            <b>保存データの再チェックで問題が見つかりました。</b>
           </p>
           <ul>
             {recheck.issues
@@ -125,147 +116,152 @@ export function Report({ id }: { id: string }) {
         </div>
       )}
 
-      <div className="layout report-layout">
-        <div className="stack">
-          <section className="panel" aria-labelledby="scenario-title">
-            <div className="row">
-              <span className="eyebrow">SCENARIO</span>
-              <span className="muted">条件ごとの見通し</span>
-            </div>
-            <h2 id="scenario-title" className="visually-hidden">
-              条件別の評価
+      <div className="report">
+        <section className="sec first r-cand" aria-labelledby="cand-title">
+          <div className="sec-head">
+            <span className="tag">Focus</span>
+            <h2 id="cand-title" className="sec-title">
+              中心候補と注目馬
             </h2>
-            <div className="tabs mt" role="tablist" aria-label="条件">
-              {SCENARIO_IDS.map((sid) => {
-                const s = response.scenarios.find((x) => x.id === sid);
-                return (
-                  <button
-                    key={sid}
-                    type="button"
-                    role="tab"
-                    id={`tab-${sid}`}
-                    aria-selected={scenario === sid}
-                    aria-controls="scenario-panel"
-                    className="btn"
-                    onClick={() => setScenario(sid)}
-                  >
-                    <Icon name={sid === 'base' ? 'sun' : sid === 'wet' ? 'cloud-rain' : 'wind'} />
-                    {SCENARIO_LABELS[sid]}
-                    {(!s || s.status !== 'analyzed') && <span className="tab-note">未分析</span>}
-                  </button>
-                );
-              })}
+          </div>
+          <Candidates snapshot={snapshot} response={response} />
+        </section>
+
+        <section className="sec r-comp" aria-labelledby="comp-title">
+          <div className="sec-head">
+            <span className="tag purple">Scenario</span>
+            <h2 id="comp-title" className="sec-title">
+              条件別の比較
+            </h2>
+          </div>
+          <ScenarioCompare snapshot={snapshot} response={response} scenario={scenario} onChange={setScenario} onReanalyze={reanalyze} />
+        </section>
+
+        <aside className="r-side" aria-label="予算配分">
+          <BudgetPanel snapshot={snapshot} response={response} />
+        </aside>
+
+        <section className="sec r-review" aria-labelledby="review-title">
+          <div className="sec-head">
+            <span className="tag">Review</span>
+            <h2 id="review-title" className="sec-title">
+              見直す条件
+            </h2>
+          </div>
+          {response.reviewTriggers.length ? (
+            <ul className="plain">
+              {response.reviewTriggers.map((t, i) => (
+                <li key={i}>・{t}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="muted">記載なし</p>
+          )}
+          <button type="button" className="btn mt" onClick={reanalyze}>
+            <Icon name="history" /> 再分析（新しい版として保存）
+          </button>
+        </section>
+
+        <section className="sec r-details" aria-labelledby="details-title">
+          <div className="sec-head">
+            <span className="tag">Detail</span>
+            <h2 id="details-title" className="sec-title">
+              詳しい根拠・不足情報・出典
+            </h2>
+          </div>
+          <details>
+            <summary>
+              不足している情報 <span className="badge warn">{snapshot.missing.length + response.limitations.length}件</span>
+            </summary>
+            <div className="detail-body">
+              <ul className="plain">
+                {snapshot.missing.map((m, i) => (
+                  <li key={`m${i}`}>未取得：{m}</li>
+                ))}
+                {response.limitations.map((m, i) => (
+                  <li key={`l${i}`}>{m}</li>
+                ))}
+                {snapshot.missing.length + response.limitations.length === 0 && <li className="muted">記載なし</li>}
+              </ul>
             </div>
-            <div id="scenario-panel" role="tabpanel" aria-labelledby={`tab-${scenario}`} aria-live="polite">
-              {sc && sc.status === 'analyzed' && sc.order.length > 0 ? (
-                <>
-                  <p className="scenario-reason">
-                    <b>順位の理由：</b>
-                    {sc.reason || '記載なし'}
-                  </p>
-                  <ScenarioRanking snapshot={snapshot} response={response} scenario={scenario} />
-                </>
+          </details>
+          <details>
+            <summary>
+              出典 <span className="badge">{snapshot.sources.length}件</span>
+            </summary>
+            <div className="detail-body">
+              <p className="hint">
+                情報締切 {formatJst(snapshot.cutoffAt)}／オッズ対象時点 {formatJst(snapshot.odds?.asOf ?? null)}
+              </p>
+              {snapshot.sources.length === 0 ? (
+                <p className="muted">出典の記録はありません。</p>
               ) : (
-                <EmptyState title={`「${SCENARIO_LABELS[scenario]}」は未分析です`}>
-                  <p className="muted">{sc?.reason || 'この条件の分析結果は応答に含まれていません。'}</p>
-                  <button type="button" className="btn" onClick={reanalyze}>
-                    情報を補って再分析
-                  </button>
-                </EmptyState>
+                <ul className="sources">
+                  {snapshot.sources.map((s) => (
+                    <li key={s.id}>
+                      <b>{s.label}</b>：{s.provider}
+                      {s.isDemo && <span className="badge warn" style={{ marginLeft: 8 }}>架空</span>}
+                      <br />
+                      <SafeLink href={s.url} />
+                      <br />
+                      <span className="hint">
+                        取得 {formatJst(s.fetchedAt)}／対象時点 {formatJst(s.asOf)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
-            <p className="hint">条件を切り替えても、配分（賭け金）は変わりません。</p>
-          </section>
+          </details>
+          <details>
+            <summary>分析の詳細</summary>
+            <div className="detail-body">
+              <dl className="kv">
+                <dt>作成日時</dt>
+                <dd>{formatJst(rec.createdAt)}</dd>
+                <dt>版</dt>
+                <dd>
+                  版{rec.version}（{rec.kind === 'original' ? '元レポート' : '再分析版'}）
+                </dd>
+                <dt>形式チェック</dt>
+                <dd>{recheck.ok ? '形式と照合のチェックに合格。予想の正しさは検証していません。' : '問題あり（上部の表示を参照）'}</dd>
+                <dt>計算</dt>
+                <dd>
+                  {response.calculation.executed ? 'Claude側で実行済み' : 'Claude側では未実行'}（{response.calculation.method || '方法の記載なし'}）。金額はアプリで再計算しています。
+                </dd>
+                <dt>データ</dt>
+                <dd>{rec.isDemo ? '架空デモ' : '利用者が入力・貼り付けした情報'}</dd>
+              </dl>
+              {siblings.length > 1 && (
+                <nav aria-label="この分析の版">
+                  <ul className="row plain">
+                    {siblings.map((s) =>
+                      s.id === rec.id ? (
+                        <li key={s.id}>
+                          <span className="badge ok" aria-current="page">
+                            版{s.version}（表示中）
+                          </span>
+                        </li>
+                      ) : (
+                        <li key={s.id}>
+                          <a className="btn small" href={`#/report/${s.id}`}>
+                            版{s.version}
+                            {s.kind === 'original' ? '（元）' : ''}
+                          </a>
+                        </li>
+                      ),
+                    )}
+                  </ul>
+                </nav>
+              )}
+              <a className="btn small" href="#/saved">
+                <Icon name="wallet" /> レース後の収支を記録する
+              </a>
+            </div>
+          </details>
+        </section>
 
-          <section className="panel" aria-labelledby="compare-title">
-            <h2 id="compare-title" className="h3">
-              条件の比較
-            </h2>
-            <ul className="compare">
-              {SCENARIO_IDS.map((sid) => {
-                const s = response.scenarios.find((x) => x.id === sid);
-                return (
-                  <li key={sid}>
-                    <span className="compare-label">{SCENARIO_LABELS[sid]}</span>
-                    <span>{s && s.status === 'analyzed' && s.order.length ? s.order.slice(0, 3).map((id) => horseLabel(snapshot, id)).join(' → ') : '未分析'}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-
-          <section className="panel" aria-labelledby="review-title">
-            <h2 id="review-title" className="h3">
-              予想を見直す条件
-            </h2>
-            {response.reviewTriggers.length ? (
-              <ul className="plain">
-                {response.reviewTriggers.map((t, i) => (
-                  <li key={i}>{t}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="muted">記載なし</p>
-            )}
-            <button type="button" className="btn mt" onClick={reanalyze}>
-              <Icon name="history" /> 再分析（新しい版として保存）
-            </button>
-          </section>
-
-          <section className="panel" aria-labelledby="missing-title">
-            <h2 id="missing-title" className="h3">
-              情報の不足
-            </h2>
-            <ul className="plain">
-              {snapshot.missing.map((m, i) => (
-                <li key={`m${i}`}>未取得：{m}</li>
-              ))}
-              {response.limitations.map((m, i) => (
-                <li key={`l${i}`}>{m}</li>
-              ))}
-              {snapshot.missing.length + response.limitations.length === 0 && <li className="muted">記載なし</li>}
-            </ul>
-            <p className="hint">
-              計算：{response.calculation.executed ? '実行済み' : '未実行'}（{response.calculation.method || '方法の記載なし'}）
-            </p>
-          </section>
-
-          <section className="panel" aria-labelledby="source-title">
-            <h2 id="source-title" className="h3">
-              出典
-            </h2>
-            <p className="hint">情報締切：{formatJst(snapshot.cutoffAt)}／オッズ対象時点：{formatJst(snapshot.odds?.asOf ?? null)}</p>
-            {snapshot.sources.length === 0 ? (
-              <p className={rec.isDemo ? 'demo' : 'muted'}>出典の記録はありません{rec.isDemo ? '（架空デモ）' : ''}。</p>
-            ) : (
-              <ul className="sources">
-                {snapshot.sources.map((s) => (
-                  <li key={s.id}>
-                    <b>{s.label}</b>：{s.provider} {s.isDemo && <DemoBadge />}
-                    <br />
-                    <SafeLink href={s.url} />
-                    <br />
-                    <span className="hint">
-                      取得 {formatJst(s.fetchedAt)}／対象時点 {formatJst(s.asOf)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </div>
-
-        <aside className="stack side">
-          <BudgetPanel snapshot={snapshot} response={response} />
-          <NotePanel rec={rec} onChange={setRec} />
-          <section className="panel">
-            <h2 className="h3">レース後の記録</h2>
-            <p className="muted">結果と収支は「保存した分析」で別に記録します。予想時点の内容は変わりません。</p>
-            <a className="btn" href="#/saved">
-              <Icon name="wallet" /> 収支を記録する
-            </a>
-          </section>
-        </aside>
+        <NotePanel rec={rec} onChange={setRec} />
       </div>
     </>
   );
@@ -292,71 +288,73 @@ function NotePanel({ rec, onChange }: { rec: SavedAnalysis; onChange: (r: SavedA
   }
 
   return (
-    <section className="panel" aria-labelledby="note-title">
-      <span className="eyebrow">NOTE ARTICLE</span>
-      <h2 id="note-title" className="h3">
-        分析を記事に
-      </h2>
-      <p className="muted">根拠と注意点を保ったまま、Claudeへの記事作成指示をコピーします（noteへ直接投稿する機能ではありません）。</p>
-      <div className="stack-sm">
+    <section className="sec r-note" aria-labelledby="note-title">
+      <div className="sec-head">
+        <span className="tag">Note</span>
+        <h2 id="note-title" className="sec-title">
+          note記事にする
+        </h2>
+      </div>
+      <p className="muted">予想・金額・出典を変えずに、Claudeへの記事作成指示をコピーします。noteへ直接投稿する機能ではありません。</p>
+      <div className="row mt">
         <CopyButton label="note記事作成用コピー" getText={() => buildNotePrompt(rec)} />
         <OpenClaudeLink />
       </div>
-      <details className="subgroup" open={Boolean(rec.noteArticle)}>
+      <details className="subgroup mt" open={Boolean(rec.noteArticle)}>
         <summary>生成された記事を貼り戻す（任意）</summary>
-        <label>
-          記事の原文（Markdown）
-          <textarea rows={8} maxLength={60000} value={text} onChange={(e) => setText(e.target.value)} className="mono" />
-        </label>
-        <div className="row mt">
-          <button
-            type="button"
-            className="btn"
-            disabled={!/^\s*`{3,}/.test(text)}
-            onClick={() => {
-              const r = stripOuterFence(text);
-              setText(r.text);
-              setMsg(r.stripped ? '外側のコードフェンスを外しました' : '外側のコードフェンスが見つかりません');
-            }}
-          >
-            外側のコードフェンスを外す
-          </button>
-          <button type="button" className="btn primary" disabled={saving || !text.trim()} onClick={() => save(text)}>
-            {saving && <span className="spinner" aria-hidden="true" />}保存
-          </button>
-          {rec.noteArticle && (
-            <button type="button" className="btn danger" disabled={saving} onClick={() => save(null).then(() => setText(''))}>
-              削除
+        <div className="detail-body" style={{ display: 'grid', gap: 12 }}>
+          <label>
+            記事の原文（Markdown）
+            <textarea rows={8} maxLength={60000} value={text} onChange={(e) => setText(e.target.value)} className="mono" />
+          </label>
+          <div className="row">
+            <button
+              type="button"
+              className="btn small"
+              disabled={!/^\s*`{3,}/.test(text)}
+              onClick={() => {
+                const r = stripOuterFence(text);
+                setText(r.text);
+                setMsg(r.stripped ? '外側のコードフェンスを外しました' : '外側のコードフェンスが見つかりません');
+              }}
+            >
+              外側のコードフェンスを外す
             </button>
+            <button type="button" className="btn primary small" disabled={saving || !text.trim()} onClick={() => save(text)}>
+              {saving && <span className="spinner" aria-hidden="true" />}保存
+            </button>
+            {rec.noteArticle && (
+              <button type="button" className="btn danger small" disabled={saving} onClick={() => save(null).then(() => setText(''))}>
+                削除
+              </button>
+            )}
+          </div>
+          {msg && (
+            <p className="ok-text" role="status">
+              {msg}
+            </p>
+          )}
+          {error && (
+            <p className="error-text" role="alert">
+              {error}
+            </p>
+          )}
+          {text.trim() && (
+            <>
+              <div className="tabs" role="tablist" aria-label="記事の表示">
+                <button type="button" role="tab" className="btn small" aria-selected={view === 'preview'} onClick={() => setView('preview')}>
+                  表示用プレビュー
+                </button>
+                <button type="button" role="tab" className="btn small" aria-selected={view === 'raw'} onClick={() => setView('raw')}>
+                  コピー用原文
+                </button>
+              </div>
+              <div role="tabpanel">{view === 'preview' ? <SafeMarkdown source={stripOuterFence(text).text} /> : <pre className="raw">{text}</pre>}</div>
+              {view === 'raw' && <CopyButton label="原文をコピー" primary={false} getText={() => text} />}
+              <p className="hint">プレビューは簡易表示です。noteに貼り付けたとき見出しが必ず変換されるとは限りません。</p>
+            </>
           )}
         </div>
-        {msg && (
-          <p className="ok-text" role="status">
-            {msg}
-          </p>
-        )}
-        {error && (
-          <p className="error-text" role="alert">
-            {error}
-          </p>
-        )}
-        {text.trim() && (
-          <>
-            <div className="tabs mt" role="tablist" aria-label="記事の表示">
-              <button type="button" role="tab" className="btn" aria-selected={view === 'preview'} onClick={() => setView('preview')}>
-                表示用プレビュー
-              </button>
-              <button type="button" role="tab" className="btn" aria-selected={view === 'raw'} onClick={() => setView('raw')}>
-                コピー用原文
-              </button>
-            </div>
-            <div role="tabpanel" className="mt">
-              {view === 'preview' ? <SafeMarkdown source={stripOuterFence(text).text} /> : <pre className="raw">{text}</pre>}
-            </div>
-            {view === 'raw' && <CopyButton label="原文をコピー" primary={false} getText={() => text} />}
-            <p className="hint">プレビューは簡易表示です。noteに貼り付けたとき見出し等が必ず変換されるとは限りません。</p>
-          </>
-        )}
       </details>
     </section>
   );

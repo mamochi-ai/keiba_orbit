@@ -25,8 +25,8 @@ export function CardImport({ onApplied }: { onApplied: () => void }) {
 
   if (draft.isDemo) {
     return (
-      <section className="panel" aria-labelledby="card-title">
-        <h2 id="card-title" className="h3">
+      <section className="item card-import" aria-labelledby="card-title" style={{ padding: "14px 12px" }}>
+        <h2 id="card-title" className="item-label">
           出馬表を貼り付けて自動入力
         </h2>
         <p className="hint">架空デモでは使えません。実在のレースで「新しく始める」から使ってください。</p>
@@ -107,7 +107,7 @@ export function CardImport({ onApplied }: { onApplied: () => void }) {
   }
 
   return (
-    <details className="panel item card-import" open={initiallyOpen}>
+    <details className="item card-import" open={initiallyOpen}>
       <summary className="item-head">
         <span className="item-label">
           <Icon name="paste" /> 出馬表を貼り付けて自動入力

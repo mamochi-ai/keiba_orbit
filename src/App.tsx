@@ -6,17 +6,32 @@ import { Paste } from './screens/Paste';
 import { Report } from './screens/Report';
 import { Saved } from './screens/Saved';
 import { SettingsScreen } from './screens/Settings';
-import { Icon } from './ui/common';
+import { Icon, type IconName } from './ui/common';
 
-const NAV = [
-  { href: '#/', label: 'レース', icon: 'calendar', match: (r: string) => r === '/' || r === '/prepare' || r === '/paste' },
-  { href: '#/saved', label: '保存した分析', icon: 'history', match: (r: string) => r === '/saved' || r.startsWith('/report/') },
-  { href: '#/settings', label: '設定', icon: 'settings', match: (r: string) => r === '/settings' },
-] as const;
+const NAV: { href: string; label: string; icon: IconName; match: (r: string) => boolean }[] = [
+  { href: '#/', label: 'レース', icon: 'calendar', match: (r) => r === '/' || r === '/prepare' || r === '/paste' },
+  { href: '#/saved', label: '保存した分析', icon: 'history', match: (r) => r === '/saved' || r.startsWith('/report/') },
+  { href: '#/settings', label: '設定', icon: 'settings', match: (r) => r === '/settings' },
+];
+
+function NavLinks({ route }: { route: string }) {
+  return (
+    <ul>
+      {NAV.map((n) => (
+        <li key={n.href}>
+          <a href={n.href} aria-current={n.match(route) ? 'page' : undefined}>
+            <Icon name={n.icon} />
+            {n.label}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function App() {
   const route = useHashRoute();
-  const { draft, draftLoaded, storageError } = useApp();
+  const { draft, draftLoaded, storageError, reportIsDemo } = useApp();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -25,11 +40,14 @@ export function App() {
     return () => window.clearTimeout(t);
   }, [route]);
 
-  let screen;
   const reportMatch = /^\/report\/([A-Za-z0-9_-]{1,64})$/.exec(route);
+  // One compact demo notice per screen: the working draft on race screens, the record on a report.
+  const showDemo = reportMatch ? reportIsDemo : (route === '/' || route === '/prepare' || route === '/paste') && draft.isDemo;
+
+  let screen;
   if (!draftLoaded) {
     screen = (
-      <p className="row section" aria-busy="true">
+      <p className="row" style={{ paddingTop: 32 }} aria-busy="true">
         <span className="spinner" aria-hidden="true" /> 端末の保存データを読み込み中
       </p>
     );
@@ -41,10 +59,12 @@ export function App() {
   else if (reportMatch) screen = <Report id={reportMatch[1]!} />;
   else
     screen = (
-      <section className="panel section">
-        <h1 tabIndex={-1}>ページが見つかりません</h1>
+      <section className="sec first">
+        <h1 tabIndex={-1} className="page-title">
+          ページが見つかりません
+        </h1>
         <a className="btn" href="#/">
-          ホームへ
+          レースへ戻る
         </a>
       </section>
     );
@@ -54,41 +74,37 @@ export function App() {
       <a className="skip" href="#main">
         本文へ移動
       </a>
-      <header className="top">
-        <a className="brand" href="#/" aria-label="KEIBA ORBIT ホーム">
-          <img src="assets/orbit-mark.svg" alt="" />
-          KEIBA ORBIT
-        </a>
-        <nav aria-label="メイン">
-          <ul className="nav">
-            {NAV.map((n) => (
-              <li key={n.href}>
-                <a href={n.href} aria-current={n.match(route) ? 'page' : undefined}>
-                  <Icon name={n.icon} />
-                  {n.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      </header>
-      {draft.isDemo && (
-        <div className="demo-banner" role="note">
-          <Icon name="warning" />
-          <span>
-            <b>架空デモ表示中</b>：馬・レース・金額はすべて架空です。予想や購入判断には使えません。
-          </span>
-        </div>
-      )}
+      <div className="top-sticky">
+        <header className="topbar">
+          <a className="brand" href="#/" aria-label="KEIBA ORBIT レース画面へ">
+            <img src="assets/orbit-mark.svg" alt="" />
+            KEIBA ORBIT
+          </a>
+          <nav className="topnav" aria-label="メイン">
+            <NavLinks route={route} />
+          </nav>
+        </header>
+        {showDemo && (
+          <p className="demo-strip" role="note">
+            <Icon name="warning" />
+            <span>
+              <b>架空デモ</b>｜実在レースの予想ではありません
+            </span>
+          </p>
+        )}
+      </div>
       {storageError && (
-        <p className="error-box" role="alert">
+        <p className="error-box storage-error" role="alert">
           {storageError}
         </p>
       )}
       <main id="main">{screen}</main>
-      <footer>
-        KEIBA ORBIT — 個人用の分析ノート。実際の馬券購入機能はありません。分析結果の的中・利益は保証しません。天気：Weather data by Open-Meteo.com（CC BY 4.0）
+      <footer className="app-foot">
+        個人用の分析ノートです。実際の馬券購入機能はありません。的中・利益は保証しません。天気：Weather data by Open-Meteo.com（CC BY 4.0）
       </footer>
+      <nav className="bottomnav" aria-label="メイン（下部）">
+        <NavLinks route={route} />
+      </nav>
     </div>
   );
 }
