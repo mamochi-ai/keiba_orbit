@@ -412,3 +412,12 @@ input[type=date], input[type=datetime-local], input[type=time] {
 }
 input::-webkit-date-and-time-value { text-align: left; margin: 0; }
 input::-webkit-datetime-edit { padding: 0; }
+
+/* Second line of defence for iPad Safari: whatever width Safari gives the native date
+   control, the visible box is clipped to its column. Focus is drawn on the wrapper. */
+.grid-2 > * { min-width: 0; }
+.date-wrap { display: block; position: relative; margin-top: 6px; overflow: hidden; border-radius: 8px; }
+.date-wrap > input { margin-top: 0; width: 100%; box-sizing: border-box; }
+.date-wrap > input:focus { outline: none; }
+.date-wrap:focus-within { outline: 2px solid var(--cyan); outline-offset: 0; }
+input::-webkit-date-and-time-value { min-height: 24px; line-height: 24px; }

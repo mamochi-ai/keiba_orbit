@@ -198,7 +198,9 @@ export function CardImport({ onApplied }: { onApplied: () => void }) {
             {useOdds && hasOdds && (
               <label>
                 オッズの対象時点（JST・コピーした時刻）
-                <input type="datetime-local" value={oddsLocal} onChange={(e) => setOddsLocal(e.target.value)} />
+                <span className="date-wrap">
+                  <input type="datetime-local" value={oddsLocal} onChange={(e) => setOddsLocal(e.target.value)} />
+                </span>
               </label>
             )}
             <label className="check">

@@ -136,15 +136,17 @@ export function Home() {
         <div className="grid-2">
           <label>
             開催日 <span className="req">必須</span>
-            <input
-              id="home-date"
-              type="date"
-              value={draft.date}
-              onChange={(e) => set('date', e.target.value)}
-              aria-invalid={Boolean(errors.date)}
-              aria-describedby="err-date"
-              disabled={draft.isDemo}
-            />
+            <span className="date-wrap">
+              <input
+                id="home-date"
+                type="date"
+                value={draft.date}
+                onChange={(e) => set('date', e.target.value)}
+                aria-invalid={Boolean(errors.date)}
+                aria-describedby="err-date"
+                disabled={draft.isDemo}
+              />
+            </span>
             <FieldError id="err-date" message={errors.date} />
             {draft.isDemo && <span className="hint">架空デモには日付がありません</span>}
           </label>
