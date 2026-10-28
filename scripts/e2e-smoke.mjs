@@ -2,6 +2,7 @@
 // Walks the demo flow, checks error states, horizontal overflow at 390/768/1024/1366 and
 // keyboard focus. Usage: node scripts/e2e-smoke.mjs [baseUrl] [screenshotDir]
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 
 // Uses the globally installed Playwright (not a project dependency).
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -261,6 +262,52 @@ check('real report: HTML in summary is text', (await r.locator('.cover script').
 check('real report: no demo strip', (await r.locator('.demo-strip').count()) === 0);
 check('real report: confirmed course/R shown', (await r.locator('.cover-meta').innerText()).includes('東京') && (await r.locator('.cover-meta').innerText()).includes('11R'));
 await real.close();
+
+// Received data (受取データ, schema 1.0)
+const feedCtx = await browser.newContext({ viewport: { width: 1024, height: 900 } });
+const fp = await feedCtx.newPage();
+const sampleFeed = JSON.parse(readFileSync(new URL('../src/test/feed-sample.json', import.meta.url), 'utf8'));
+const importFeed = async (obj, fenced = false) => {
+  await fp.goto(base + '#/feed');
+  await fp.getByLabel('受け取りデータ（JSON）').fill(fenced ? '```json\n' + JSON.stringify(obj, null, 2) + '\n```' : JSON.stringify(obj));
+  await fp.getByRole('button', { name: '取り込む', exact: true }).click();
+  await fp.locator('.ok-box, .error-box').first().waitFor();
+};
+await importFeed(sampleFeed, true);
+const summary = await fp.locator('[role=status]').first().innerText();
+check('feed: imports 7 runners and 21 mock pairs (fenced paste)', summary.includes('出走馬 7頭') && summary.includes('仮オッズ 21組') && summary.includes('テストデータ'), summary);
+check('feed: sample shown separately', (await fp.locator('#feed-sample').isVisible()) && (await fp.getByText('まだ受け取ったレースはありません。').isVisible()));
+await importFeed(sampleFeed);
+const summary2 = await fp.locator('[role=status]').first().innerText();
+check('feed: re-import updates, no duplicates', summary2.includes('新規 0件・更新 1件') && (await fp.locator('#feed-sample ~ * .saved-item, section:has(#feed-sample) .saved-item').count()) === 1, summary2);
+await fp.locator('section:has(#feed-sample) .saved-item a').first().click();
+await fp.getByRole('heading', { name: /2歳未勝利/ }).waitFor();
+check('feed race: 7 runners and 21 range pairs', (await fp.locator('.feed-runner').count()) === 7 && (await fp.locator('.pair-grid li').count()) === 21 && (await fp.locator('.pair-grid').innerText()).includes('1.2〜1.6倍'));
+check('feed race: mock odds labelled', (await fp.getByText('仮オッズ・分析に使いません').isVisible()));
+check('feed race: going is reference info with nulls as 未取得', (await fp.getByText('参考・過去情報').first().isVisible()) && (await fp.locator('pre.raw').innerText()).includes('クッション値：未取得'));
+for (const w of [390, 768]) {
+  await fp.setViewportSize({ width: w, height: 844 });
+  const o = await fp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  check(`feed race: no horizontal overflow at ${w}px`, o <= 0, `overflow=${o}`);
+  if (shots) await fp.screenshot({ path: `${shots}/feed-race-${w}.png`, fullPage: true });
+}
+await fp.setViewportSize({ width: 1024, height: 900 });
+await fp.getByRole('button', { name: /テストデータで試す/ }).click();
+await fp.waitForURL(/#\/prepare/);
+check('feed → prep: demo draft with 7 runners, no odds', (await fp.locator('.demo-strip').isVisible()) && (await fp.getByText('出走表').first().isVisible()));
+// Partial update: odds 取得未完了 / pairs [] / is_mock false keeps entries and previous odds
+const partial = structuredClone(sampleFeed);
+partial.races[0].wide_odds = { ...partial.races[0].wide_odds, status: '取得未完了', is_mock: false, pairs: [] };
+await importFeed(partial);
+const s3 = await fp.locator('[role=status]').first().innerText();
+check('feed: partial odds import keeps entries', s3.includes('出走馬 7頭'), s3);
+// Invalid pairs are reported, valid data still imported
+const bad = structuredClone(sampleFeed);
+bad.races[0].wide_odds.pairs.push({ horse_number_1: 1, horse_number_2: 9, odds_min: 2, odds_max: 3 }, { horse_number_1: 3, horse_number_2: 3, odds_min: 2, odds_max: 3 }, { horse_number_1: 4, horse_number_2: 5, odds_min: 9, odds_max: 3 });
+await importFeed(bad);
+const errs = await fp.locator('.error-box').innerText();
+check('feed: detects bad horse number / same-horse / min>max', errs.includes('1-9') && errs.includes('同じ馬番どうし') && errs.includes('上限 3 を超えて'), errs);
+await feedCtx.close();
 
 // Empty states in a fresh browser profile
 const fresh = await browser.newContext({ viewport: { width: 390, height: 844 } });

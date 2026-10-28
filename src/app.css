@@ -99,7 +99,7 @@ legend { padding: 0; }
 .icon-btn { width: 44px; min-height: 44px; padding: 0; }
 .file-btn { position: relative; }
 .file-btn:focus-within { outline: 3px solid var(--amber); outline-offset: 3px; }
-.linkish { background: none; border: 0; padding: 0 4px; min-height: 44px; color: var(--cyan); font: inherit; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.linkish { display: inline-flex; align-items: center; background: none; border: 0; padding: 0 4px; min-height: 44px; color: var(--cyan); font: inherit; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
 .row { display: flex; gap: 10px 12px; align-items: center; flex-wrap: wrap; }
 .spinner { width: 18px; height: 18px; border: 2px solid #405974; border-top-color: var(--cyan); border-radius: 50%; animation: spin 1s linear infinite; flex: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -421,3 +421,14 @@ input::-webkit-datetime-edit { padding: 0; }
 .date-wrap > input:focus { outline: none; }
 .date-wrap:focus-within { outline: 2px solid var(--cyan); outline-offset: 0; }
 input::-webkit-date-and-time-value { min-height: 24px; line-height: 24px; }
+
+/* Received data */
+.feed-runners { border-top: 1px solid var(--line); }
+.feed-runner { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.pair-grid { list-style: none; padding: 0; margin: 12px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0 20px; }
+.pair-grid li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.pair-key { color: var(--cyan); font-weight: 600; }
+.feed-pick { margin: 0 0 22px; }
+.feed-pick ul { list-style: none; padding: 0; margin: 6px 0 0; border-top: 1px solid var(--line); }
+.feed-pick li a { display: flex; justify-content: space-between; gap: 10px; align-items: center; min-height: 48px; padding: 6px 0; border-bottom: 1px solid var(--line); color: var(--ink); text-decoration: none; }
+.feed-pick li a:hover { background: var(--surface); }

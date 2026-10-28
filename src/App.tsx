@@ -6,10 +6,11 @@ import { Paste } from './screens/Paste';
 import { Report } from './screens/Report';
 import { Saved } from './screens/Saved';
 import { SettingsScreen } from './screens/Settings';
+import { Feed, FeedRaceView } from './screens/Feed';
 import { Icon, type IconName } from './ui/common';
 
 const NAV: { href: string; label: string; icon: IconName; match: (r: string) => boolean }[] = [
-  { href: '#/', label: 'レース', icon: 'calendar', match: (r) => r === '/' || r === '/prepare' || r === '/paste' },
+  { href: '#/', label: 'レース', icon: 'calendar', match: (r) => r === '/' || r === '/prepare' || r === '/paste' || r.startsWith('/feed') },
   { href: '#/saved', label: '保存した分析', icon: 'history', match: (r) => r === '/saved' || r.startsWith('/report/') },
   { href: '#/settings', label: '設定', icon: 'settings', match: (r) => r === '/settings' },
 ];
@@ -41,6 +42,14 @@ export function App() {
   }, [route]);
 
   const reportMatch = /^\/report\/([A-Za-z0-9_-]{1,64})$/.exec(route);
+  const feedMatch = (() => {
+    const m = /^\/feed\/(.{1,300})$/.exec(route);
+    try {
+      return m ? decodeURIComponent(m[1]!) : null;
+    } catch {
+      return null;
+    }
+  })();
   // One compact demo notice per screen: the working draft on race screens, the record on a report.
   const showDemo = reportMatch ? reportIsDemo : (route === '/' || route === '/prepare' || route === '/paste') && draft.isDemo;
 
@@ -56,6 +65,8 @@ export function App() {
   else if (route === '/paste') screen = <Paste />;
   else if (route === '/saved') screen = <Saved />;
   else if (route === '/settings') screen = <SettingsScreen />;
+  else if (route === '/feed') screen = <Feed />;
+  else if (feedMatch) screen = <FeedRaceView key={feedMatch} fkey={feedMatch} />;
   else if (reportMatch) screen = <Report id={reportMatch[1]!} />;
   else
     screen = (

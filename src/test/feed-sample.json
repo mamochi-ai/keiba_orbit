@@ -1,0 +1,255 @@
+{
+  "schema_version": "1.0",
+  "sample": true,
+  "description": "Claude Codeの取込・表示修正用。過去の実出馬表・馬場表示と、明示した仮ワイドオッズを組み合わせたテスト用サンプル。実際の過去の事前スナップショットではありません。",
+  "checked_on_jst": "2026-10-28",
+  "collection_notes": [
+    "出馬表・馬場情報は前回確認したJRA公式の過去データ。",
+    "ワイド全21組の数値のみ仮データ。過去の実オッズ・払戻金ではない。",
+    "このファイルは今週末の実データでも、全項目の取得成功を保証する資料でもない。"
+  ],
+  "races": [
+    {
+      "race_key": "2026-10-25_東京_02",
+      "date": "2026-10-25",
+      "venue": "東京",
+      "race_number": 2,
+      "name": "2歳未勝利",
+      "start_time_jst": "10:20",
+      "surface": "芝",
+      "distance_m": 2000,
+      "direction": "左",
+      "entries_status": "取得済み・過去レース",
+      "source_url": "https://sp.jra.jp/JRADB/accessD.html?CNAME=sw01dde1005202604090220261025/2A",
+      "runners": [
+        {
+          "bracket": 1,
+          "horse_number": 1,
+          "horse_name": "アースグレイジング",
+          "sex": "牡",
+          "age": 2,
+          "weight_kg": 55,
+          "jockey": "長浜鴻緒"
+        },
+        {
+          "bracket": 2,
+          "horse_number": 2,
+          "horse_name": "シアルナーレ",
+          "sex": "牡",
+          "age": 2,
+          "weight_kg": 56,
+          "jockey": "佐々木大輔"
+        },
+        {
+          "bracket": 3,
+          "horse_number": 3,
+          "horse_name": "マテンロウアルカナ",
+          "sex": "牡",
+          "age": 2,
+          "weight_kg": 56,
+          "jockey": "横山典弘"
+        },
+        {
+          "bracket": 4,
+          "horse_number": 4,
+          "horse_name": "ウイニングレイ",
+          "sex": "牝",
+          "age": 2,
+          "weight_kg": 55,
+          "jockey": "松岡正海"
+        },
+        {
+          "bracket": 5,
+          "horse_number": 5,
+          "horse_name": "ブライトシーン",
+          "sex": "牡",
+          "age": 2,
+          "weight_kg": 53,
+          "jockey": "遠藤汰月"
+        },
+        {
+          "bracket": 6,
+          "horse_number": 6,
+          "horse_name": "スキエンティア",
+          "sex": "牡",
+          "age": 2,
+          "weight_kg": 56,
+          "jockey": "木幡巧也"
+        },
+        {
+          "bracket": 7,
+          "horse_number": 7,
+          "horse_name": "ヴェルバーニア",
+          "sex": "牡",
+          "age": 2,
+          "weight_kg": 56,
+          "jockey": "横山武史"
+        }
+      ],
+      "wide_odds": {
+        "status": "仮データ",
+        "is_mock": true,
+        "source_url": null,
+        "source_updated_at_jst": null,
+        "is_final": null,
+        "pairs": [
+          {
+            "horse_number_1": 1,
+            "horse_number_2": 2,
+            "odds_min": 1.2,
+            "odds_max": 1.6
+          },
+          {
+            "horse_number_1": 1,
+            "horse_number_2": 3,
+            "odds_min": 1.9,
+            "odds_max": 2.5
+          },
+          {
+            "horse_number_1": 1,
+            "horse_number_2": 4,
+            "odds_min": 2.6,
+            "odds_max": 3.4
+          },
+          {
+            "horse_number_1": 1,
+            "horse_number_2": 5,
+            "odds_min": 3.3,
+            "odds_max": 4.3
+          },
+          {
+            "horse_number_1": 1,
+            "horse_number_2": 6,
+            "odds_min": 4.0,
+            "odds_max": 5.2
+          },
+          {
+            "horse_number_1": 1,
+            "horse_number_2": 7,
+            "odds_min": 4.7,
+            "odds_max": 6.1
+          },
+          {
+            "horse_number_1": 2,
+            "horse_number_2": 3,
+            "odds_min": 5.4,
+            "odds_max": 7.0
+          },
+          {
+            "horse_number_1": 2,
+            "horse_number_2": 4,
+            "odds_min": 6.1,
+            "odds_max": 7.9
+          },
+          {
+            "horse_number_1": 2,
+            "horse_number_2": 5,
+            "odds_min": 6.8,
+            "odds_max": 8.8
+          },
+          {
+            "horse_number_1": 2,
+            "horse_number_2": 6,
+            "odds_min": 7.5,
+            "odds_max": 9.7
+          },
+          {
+            "horse_number_1": 2,
+            "horse_number_2": 7,
+            "odds_min": 8.2,
+            "odds_max": 10.6
+          },
+          {
+            "horse_number_1": 3,
+            "horse_number_2": 4,
+            "odds_min": 8.9,
+            "odds_max": 11.5
+          },
+          {
+            "horse_number_1": 3,
+            "horse_number_2": 5,
+            "odds_min": 9.6,
+            "odds_max": 12.4
+          },
+          {
+            "horse_number_1": 3,
+            "horse_number_2": 6,
+            "odds_min": 10.3,
+            "odds_max": 13.3
+          },
+          {
+            "horse_number_1": 3,
+            "horse_number_2": 7,
+            "odds_min": 11.0,
+            "odds_max": 14.2
+          },
+          {
+            "horse_number_1": 4,
+            "horse_number_2": 5,
+            "odds_min": 11.7,
+            "odds_max": 15.1
+          },
+          {
+            "horse_number_1": 4,
+            "horse_number_2": 6,
+            "odds_min": 12.4,
+            "odds_max": 16.0
+          },
+          {
+            "horse_number_1": 4,
+            "horse_number_2": 7,
+            "odds_min": 13.1,
+            "odds_max": 16.9
+          },
+          {
+            "horse_number_1": 5,
+            "horse_number_2": 6,
+            "odds_min": 13.8,
+            "odds_max": 17.8
+          },
+          {
+            "horse_number_1": 5,
+            "horse_number_2": 7,
+            "odds_min": 14.5,
+            "odds_max": 18.7
+          },
+          {
+            "horse_number_1": 6,
+            "horse_number_2": 7,
+            "odds_min": 15.2,
+            "odds_max": 19.6
+          }
+        ],
+        "reason": "取込と表示の動作確認用。全21組のオッズ値は人工的に作成した値。"
+      }
+    }
+  ],
+  "track_conditions": [
+    {
+      "venue": "東京",
+      "status": "一部取得・過去の表示",
+      "source_url": "https://www.jra.go.jp/keiba/baba/",
+      "page_race_date": "2026-10-25",
+      "going_as_of_jst": "2026-10-23T12:00:00+09:00",
+      "weather": "曇",
+      "turf_going": "良",
+      "dirt_going": "良",
+      "cushion_value": null,
+      "cushion_measured_at_jst": null,
+      "moisture_pct": {
+        "turf": {
+          "finish": 17.5,
+          "turn4": 16.9
+        },
+        "dirt": {
+          "finish": 7.4,
+          "turn4": 7.9
+        }
+      },
+      "moisture_measured_at_jst": null,
+      "course": "A",
+      "turf_notes": "向正面から正面直線の内柵沿いに傷み。",
+      "warning": "馬場状態の時刻は含水率の測定時刻を意味しません。レース当日の馬場状態や今週の状態として扱わないでください。"
+    }
+  ]
+}

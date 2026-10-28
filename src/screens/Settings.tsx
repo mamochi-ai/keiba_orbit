@@ -5,10 +5,10 @@ import { useApp } from '../state';
 import { CopyGuide } from '../ui/CopyGuide';
 
 const SOURCES: { item: string; state: string; how: string }[] = [
-  { item: 'レース候補・出走表', state: '自動取得は未接続', how: '出馬表ページを貼り付けて読み取り、または手入力' },
-  { item: '過去成績', state: '自動取得は未接続', how: '貼り付け（出典を記録）' },
-  { item: '馬場', state: '自動取得は未接続', how: '公式発表を見て貼り付け' },
-  { item: 'オッズ', state: '自動取得は未接続', how: '時点を記録して貼り付け' },
+  { item: 'レース候補・出走表', state: '自動取得は未接続', how: '受け取ったデータ（JSON）の取り込み、出馬表ページの貼り付け、または手入力' },
+  { item: '過去成績', state: '自動取得は未接続', how: '出馬表ページの貼り付け（出典を記録）' },
+  { item: '馬場', state: '自動取得は未接続', how: '受け取ったデータの取り込み、または公式発表を見て貼り付け' },
+  { item: 'オッズ', state: '自動取得は未接続', how: '受け取ったデータ（ワイド）の取り込み、または時点を記録して入力' },
   { item: '天気', state: 'Open-Meteo（気象庁モデル）に接続', how: 'ボタンを押したときだけ取得。非商用・CC BY 4.0' },
 ];
 
