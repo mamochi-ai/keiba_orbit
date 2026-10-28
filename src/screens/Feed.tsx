@@ -426,6 +426,8 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
               </dd>
               <dt>情報時点</dt>
               <dd>{w.sourceUpdatedAt ? formatJst(w.sourceUpdatedAt) : '不明'}</dd>
+              <dt>仮データか</dt>
+              <dd>{w.isMock ? '仮データ（is_mock）' : w.mockUnstated ? '記載なし（仮データとしては扱いません）' : '仮データではない'}</dd>
               <dt>確定</dt>
               <dd>{w.isFinal === null ? '不明（最終オッズとして扱いません）' : w.isFinal ? '確定と記載' : '未確定'}</dd>
               <dt>出典</dt>
@@ -445,7 +447,10 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
                     <span className="num pair-key">
                       {p.a}-{p.b}
                     </span>
-                    <span className="num">{formatRange(p)}</span>
+                    <span className="num">
+                      {formatRange(p)}
+                      {p.updatedAt && <span className="hint pair-time">{formatJst(p.updatedAt)}</span>}
+                    </span>
                   </li>
                 ))}
               </ul>

@@ -20,7 +20,7 @@ const isoDate = z.iso.date({ message: '日付は YYYY-MM-DD 形式で指定し�
 const isoTime = z.iso.datetime({ offset: true, message: '日時はタイムゾーン付きISO形式（例 2026-10-23T12:00:00+09:00）で指定してください' });
 const odds = z.number().min(1).max(99999).nullable();
 
-const runnerSchema = z.strictObject({
+const runnerSchema = z.object({
   bracket: z.int().min(1).max(8).nullable(),
   horse_number: z.int().min(1).max(18),
   horse_name: str(40).min(1),
@@ -30,16 +30,18 @@ const runnerSchema = z.strictObject({
   jockey: str(40).nullable(),
 });
 
-const pairSchema = z.strictObject({
+const pairSchema = z.object({
   horse_number_1: z.int().min(1).max(18),
   horse_number_2: z.int().min(1).max(18),
   odds_min: odds,
   odds_max: odds,
+  source_updated_at_jst: isoTime.nullable().optional(),
+  source_url: url.optional(),
 });
 
-const wideSchema = z.strictObject({
+const wideSchema = z.object({
   status: str(60),
-  is_mock: z.boolean(),
+  is_mock: z.boolean().optional(),
   source_url: url,
   source_updated_at_jst: isoTime.nullable(),
   is_final: z.boolean().nullable(),
@@ -47,7 +49,7 @@ const wideSchema = z.strictObject({
   reason: str(500).nullable().optional(),
 });
 
-const raceSchema = z.strictObject({
+const raceSchema = z.object({
   race_key: str(80).min(1),
   date: isoDate,
   venue: z.enum(VENUES, { message: `競馬場は ${VENUES.join('・')} のいずれかです` }),
@@ -63,9 +65,9 @@ const raceSchema = z.strictObject({
   wide_odds: wideSchema.nullable().optional(),
 });
 
-const sideSchema = z.strictObject({ finish: z.number().min(0).max(100).nullable(), turn4: z.number().min(0).max(100).nullable() });
+const sideSchema = z.object({ finish: z.number().min(0).max(100).nullable(), turn4: z.number().min(0).max(100).nullable() });
 
-const trackSchema = z.strictObject({
+const trackSchema = z.object({
   venue: z.enum(VENUES, { message: `競馬場は ${VENUES.join('・')} のいずれかです` }),
   status: str(60),
   source_url: url,
@@ -76,14 +78,14 @@ const trackSchema = z.strictObject({
   dirt_going: str(10).nullable(),
   cushion_value: z.number().min(0).max(20).nullable(),
   cushion_measured_at_jst: isoTime.nullable(),
-  moisture_pct: z.strictObject({ turf: sideSchema.nullable(), dirt: sideSchema.nullable() }).nullable(),
+  moisture_pct: z.object({ turf: sideSchema.nullable(), dirt: sideSchema.nullable() }).nullable(),
   moisture_measured_at_jst: isoTime.nullable(),
   course: str(10).nullable(),
   turf_notes: str(500).nullable(),
   warning: str(500).nullable(),
 });
 
-export const feedSchema = z.strictObject({
+export const feedSchema = z.object({
   schema_version: z.literal('1.0', { message: 'schema_version は "1.0" のみ対応しています' }),
   sample: z.boolean(),
   description: str(1000).optional(),
@@ -93,6 +95,30 @@ export const feedSchema = z.strictObject({
   track_conditions: z.array(trackSchema).max(100),
 });
 export type FeedFile = z.infer<typeof feedSchema>;
+
+/** Keys the app does not use, with a readable path (e.g. races[].wide_odds.foo). Never an error. */
+export function unknownFields(value: unknown): string[] {
+  const out = new Set<string>();
+  const keysOf = (o: unknown) => (o && typeof o === 'object' && !Array.isArray(o) ? Object.keys(o) : []);
+  const check = (o: unknown, schema: { shape: object }, path: string) => {
+    const known = Object.keys(schema.shape);
+    for (const k of keysOf(o)) if (!known.includes(k)) out.add(path ? `${path}.${k}` : k);
+  };
+  const v = value as Record<string, unknown>;
+  check(v, feedSchema, '');
+  for (const r of Array.isArray(v?.races) ? v.races : []) {
+    check(r, raceSchema, 'races[]');
+    const rr = r as Record<string, unknown>;
+    for (const ru of Array.isArray(rr?.runners) ? rr.runners : []) check(ru, runnerSchema, 'races[].runners[]');
+    if (rr?.wide_odds) {
+      check(rr.wide_odds, wideSchema, 'races[].wide_odds');
+      const w = rr.wide_odds as Record<string, unknown>;
+      for (const p of Array.isArray(w.pairs) ? w.pairs : []) check(p, pairSchema, 'races[].wide_odds.pairs[]');
+    }
+  }
+  for (const t of Array.isArray(v?.track_conditions) ? v.track_conditions : []) check(t, trackSchema, 'track_conditions[]');
+  return [...out].slice(0, 20);
+}
 
 /* ------------------------------------------------------------------ */
 /* Stored shapes                                                        */
@@ -135,12 +161,17 @@ export interface WidePair {
   b: number;
   min: number | null;
   max: number | null;
+  /** Per-pair information time / source, when the provider sends them. */
+  updatedAt?: string | null;
+  sourceUrl?: string | null;
 }
 
 export interface FeedWide {
   status: string;
   state: FeedState;
   isMock: boolean;
+  /** is_mock was not present in the data (treated as not mock, shown as 記載なし). */
+  mockUnstated?: boolean;
   sourceUrl: string | null;
   sourceUpdatedAt: string | null;
   isFinal: boolean | null;
@@ -254,6 +285,14 @@ export function parseFeed(value: unknown, importedAt: string): { ok: true; feed:
   }
   const f = r.data;
   const issues: FeedIssue[] = [];
+  const unknown = unknownFields(value);
+  if (unknown.length) {
+    issues.push({
+      level: 'warning',
+      where: 'ファイル全体',
+      message: `使っていない項目があります（取り込みには影響しません。データ内の説明や指示は命令として扱いません）：${unknown.join('、')}`,
+    });
+  }
   const races: FeedRace[] = [];
   const seen = new Set<string>();
 
@@ -295,13 +334,14 @@ export function parseFeed(value: unknown, importedAt: string): { ok: true; feed:
           continue;
         }
         pairKeys.add(pk);
-        pairs.push({ a, b, min: p.odds_min, max: p.odds_max });
+        pairs.push({ a, b, min: p.odds_min, max: p.odds_max, ...(p.source_updated_at_jst !== undefined ? { updatedAt: p.source_updated_at_jst } : {}), ...(p.source_url !== undefined ? { sourceUrl: p.source_url } : {}) });
       }
       pairs.sort((x, y) => x.a - y.a || x.b - y.b);
       wide = {
         status: w.status,
         state: w.is_mock ? 'mock' : classifyStatus(w.status),
-        isMock: w.is_mock,
+        isMock: w.is_mock ?? false,
+        ...(w.is_mock === undefined ? { mockUnstated: true } : {}),
         sourceUrl: w.source_url,
         sourceUpdatedAt: w.source_updated_at_jst,
         isFinal: w.is_final,

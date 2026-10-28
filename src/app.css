@@ -432,3 +432,4 @@ input::-webkit-date-and-time-value { min-height: 24px; line-height: 24px; }
 .feed-pick ul { list-style: none; padding: 0; margin: 6px 0 0; border-top: 1px solid var(--line); }
 .feed-pick li a { display: flex; justify-content: space-between; gap: 10px; align-items: center; min-height: 48px; padding: 6px 0; border-bottom: 1px solid var(--line); color: var(--ink); text-decoration: none; }
 .feed-pick li a:hover { background: var(--surface); }
+.pair-time { display: block; margin: 0; font-size: 12px; text-align: right; }

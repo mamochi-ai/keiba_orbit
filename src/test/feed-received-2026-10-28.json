@@ -1,0 +1,144 @@
+{
+  "schema_version": "1.0",
+  "sample": true,
+  "description": "JRA公式ページを2026-10-28に確認した取得サンプル。終了済みの2026-10-25東京2Rと、別時点の馬場情報を使用。今週末の予想用データではありません。",
+  "checked_on_jst": "2026-10-28",
+  "collection_notes": [
+    "出馬表はJRAスマートフォン版の個別URLから取得できました。",
+    "馬場情報は項目ごとに時点が異なります。含水率の測定時刻とクッション値は今回の取得結果から確認できませんでした。",
+    "ワイドのオッズ表は今回は未取得です。払戻金をオッズとして代用していません。"
+  ],
+  "races": [
+    {
+      "race_key": "2026-10-25_東京_02",
+      "date": "2026-10-25",
+      "venue": "東京",
+      "race_number": 2,
+      "name": "2歳未勝利",
+      "start_time_jst": "10:20",
+      "surface": "芝",
+      "distance_m": 2000,
+      "direction": "左",
+      "entries_status": "取得済み・過去レース",
+      "source_url": "https://sp.jra.jp/JRADB/accessD.html?CNAME=sw01dde1005202604090220261025/2A",
+      "runners": [
+        {
+          "bracket": 1,
+          "horse_number": 1,
+          "horse_name": "アースグレイジング",
+          "sex": "牡",
+          "age": 2,
+          "weight_kg": 55,
+          "jockey": "長浜鴻緒"
+        },
+        {
+          "bracket": 2,
+          "horse_number": 2,
+          "horse_name": "シアルナーレ",
+          "sex": "牡",
+          "age": 2,
+          "weight_kg": 56,
+          "jockey": "佐々木大輔"
+        },
+        {
+          "bracket": 3,
+          "horse_number": 3,
+          "horse_name": "マテンロウアルカナ",
+          "sex": "牡",
+          "age": 2,
+          "weight_kg": 56,
+          "jockey": "横山典弘"
+        },
+        {
+          "bracket": 4,
+          "horse_number": 4,
+          "horse_name": "ウイニングレイ",
+          "sex": "牝",
+          "age": 2,
+          "weight_kg": 55,
+          "jockey": "松岡正海"
+        },
+        {
+          "bracket": 5,
+          "horse_number": 5,
+          "horse_name": "ブライトシーン",
+          "sex": "牡",
+          "age": 2,
+          "weight_kg": 53,
+          "jockey": "遠藤汰月"
+        },
+        {
+          "bracket": 6,
+          "horse_number": 6,
+          "horse_name": "スキエンティア",
+          "sex": "牡",
+          "age": 2,
+          "weight_kg": 56,
+          "jockey": "木幡巧也"
+        },
+        {
+          "bracket": 7,
+          "horse_number": 7,
+          "horse_name": "ヴェルバーニア",
+          "sex": "牡",
+          "age": 2,
+          "weight_kg": 56,
+          "jockey": "横山武史"
+        }
+      ],
+      "wide_odds": {
+        "status": "取得未完了",
+        "source_url": null,
+        "source_updated_at_jst": null,
+        "is_final": null,
+        "pairs": [],
+        "reason": "今回の公式ページのテキスト取得ではワイドオッズ表へのリンクを取得できませんでした。未発売と断定するものではありません。"
+      }
+    }
+  ],
+  "track_conditions": [
+    {
+      "venue": "東京",
+      "status": "一部取得・過去の表示",
+      "source_url": "https://www.jra.go.jp/keiba/baba/",
+      "page_race_date": "2026-10-25",
+      "going_as_of_jst": "2026-10-23T12:00:00+09:00",
+      "weather": "曇",
+      "turf_going": "良",
+      "dirt_going": "良",
+      "cushion_value": null,
+      "cushion_measured_at_jst": null,
+      "moisture_pct": {
+        "turf": {
+          "finish": 17.5,
+          "turn4": 16.9
+        },
+        "dirt": {
+          "finish": 7.4,
+          "turn4": 7.9
+        }
+      },
+      "moisture_measured_at_jst": null,
+      "course": "A",
+      "turf_notes": "向正面から正面直線の内柵沿いに傷み。",
+      "warning": "馬場状態の時刻は含水率の測定時刻を意味しません。レース当日の馬場状態や今週の状態として扱わないでください。"
+    }
+  ],
+  "wide_odds_record_template": {
+    "description": "取得成功時の1組の形式。以下は空の型見本であり実データではありません。",
+    "horse_number_1": null,
+    "horse_number_2": null,
+    "odds_min": null,
+    "odds_max": null,
+    "source_updated_at_jst": null,
+    "source_url": null
+  },
+  "claude_code_instructions": [
+    "sample=true のデータは動作確認専用にする。",
+    "nullは不明・未取得であり0に変換しない。",
+    "出馬表とオッズは開催日・競馬場・R・馬番で結合する。枠番と馬番を混同しない。",
+    "ワイドの下限と上限を別々に保持する。",
+    "取得日時と発表・測定日時を区別し、時点の異なる馬場情報を自動で当日の状態にしない。",
+    "未取得と未公開を区別し、欠損を推測で補完しない。"
+  ]
+}
