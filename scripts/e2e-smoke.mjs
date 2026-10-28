@@ -294,6 +294,7 @@ for (const w of [390, 768]) {
 await fp.setViewportSize({ width: 1024, height: 900 });
 await fp.getByRole('button', { name: /テストデータで試す/ }).click();
 await fp.waitForURL(/#\/prepare/);
+await fp.locator('.demo-strip').waitFor({ timeout: 5000 }).catch(() => {});
 check('feed → prep: demo draft with 7 runners, no odds', (await fp.locator('.demo-strip').isVisible()) && (await fp.getByText('出走表').first().isVisible()));
 // Partial update: odds 取得未完了 / pairs [] / is_mock false keeps entries and previous odds
 const partial = structuredClone(sampleFeed);
@@ -307,6 +308,10 @@ bad.races[0].wide_odds.pairs.push({ horse_number_1: 1, horse_number_2: 9, odds_m
 await importFeed(bad);
 const errs = await fp.locator('.error-box').innerText();
 check('feed: detects bad horse number / same-horse / min>max', errs.includes('1-9') && errs.includes('同じ馬番どうし') && errs.includes('上限 3 を超えて'), errs);
+const receivedFeed = JSON.parse(readFileSync(new URL('../src/test/feed-received-2026-10-28.json', import.meta.url), 'utf8'));
+await importFeed(receivedFeed);
+const s4 = await fp.locator('[role=status]').first().innerText();
+check('feed: received 2026-10-28 file imports (no is_mock, doc fields ignored with notice)', s4.includes('出走馬 7頭') && s4.includes('wide_odds_record_template') && s4.includes('claude_code_instructions'), s4);
 await feedCtx.close();
 
 // Empty states in a fresh browser profile

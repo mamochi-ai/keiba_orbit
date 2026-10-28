@@ -45,15 +45,20 @@ export function feedRaceToDraft(race: FeedRace, tracks: FeedTrack[]): { draft: D
   if (w && !w.isMock && w.pairs.length) {
     const usable = w.pairs.filter((p) => p.min !== null && p.max !== null);
     if (usable.length) {
+      // Wide-level time, else the oldest per-pair time (conservative for freshness); unknown stays null.
+      const pairTimes = usable.map((p) => p.updatedAt ?? null);
+      const knownTimes = pairTimes.filter((t): t is string => Boolean(t)).sort();
+      const asOf = w.sourceUpdatedAt ?? (knownTimes.length === usable.length ? knownTimes[0]! : null);
+      if (!w.sourceUpdatedAt && knownTimes.length && new Set(knownTimes).size > 1) notes.push('ワイドの組ごとに情報時点が異なります。最も古い時点を基準にしています。');
       odds = {
-        asOf: w.sourceUpdatedAt,
+        asOf,
         sourceId: 'src-odds',
         win: [],
         wide: usable.map((p) => ({ horseIds: [`${prefix}${String(p.a).padStart(2, '0')}`, `${prefix}${String(p.b).padStart(2, '0')}`] as [string, string], min: p.min!, max: p.max! })),
       };
       items.odds = { status: 'ok', sourceId: 'src-odds', text: null, error: null };
-      sources.push(src('src-odds', 'オッズ', '受取データ（ワイドオッズ）', w.sourceUrl, w.sourceUpdatedAt));
-      if (!w.sourceUpdatedAt) notes.push('ワイドオッズの情報時点が不明です。最終オッズではありません。');
+      sources.push(src('src-odds', 'オッズ', '受取データ（ワイドオッズ）', w.sourceUrl ?? usable.find((p) => p.sourceUrl)?.sourceUrl ?? null, asOf));
+      if (!asOf) notes.push('ワイドオッズの情報時点が不明です。最終オッズではありません。');
       const missing = w.pairs.length - usable.length;
       if (missing) notes.push(`ワイド${missing}組は下限または上限が未取得のため、オッズに含めていません。`);
     }

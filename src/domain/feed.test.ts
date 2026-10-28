@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import sample from '../test/feed-sample.json';
+import received from '../test/feed-received-2026-10-28.json';
 import { formatRange, matchTrack, mergeRace, parseFeed, type FeedRace } from './feed';
 import { feedRaceToDraft } from './feedDraft';
 import { applyFeed, listFeedRaces, listFeedTracks } from '../storage/db';
@@ -142,12 +143,52 @@ describe('received JRA data (schema 1.0)', () => {
     expect(again.race.previousWide!.pairs).toHaveLength(21);
   });
 
-  it('rejects unknown fields, bad URLs and wrong schema versions with a message', () => {
-    expect(parseFeed({ ...clone(), extra: 1 }, T).ok).toBe(false);
+  it('ignores unknown fields with a warning; rejects bad URLs and wrong schema versions', () => {
+    const extra = parseFeed({ ...clone(), extra: 1 }, T);
+    expect(extra.ok).toBe(true);
+    expect(extra.ok && extra.feed.issues[0]!.message).toContain('extra');
     const v = clone();
     v.races[0]!.source_url = 'javascript:alert(1)';
     expect(parseFeed(v, T).ok).toBe(false);
     const r = parseFeed({ ...clone(), schema_version: '2.0' }, T);
     expect(r.ok === false && r.errors.join()).toContain('1.0');
+  });
+
+  it('accepts the file received on 2026-10-28 (no is_mock, extra documentation fields)', () => {
+    const f = parsed(received);
+    const race = f.races[0]!;
+    expect(race.runners).toHaveLength(7);
+    expect(race.wide).toMatchObject({ state: 'partial', isMock: false, mockUnstated: true, pairs: [] });
+    const warn = f.issues.find((i) => i.where === 'ファイル全体')!;
+    expect(warn.level).toBe('warning');
+    expect(warn.message).toContain('wide_odds_record_template');
+    expect(warn.message).toContain('claude_code_instructions');
+    expect(f.tracks[0]).toMatchObject({ cushionValue: null, moistureMeasuredAt: null });
+    const { draft, notes } = feedRaceToDraft(race, f.tracks);
+    expect(draft.isDemo).toBe(true);
+    expect(draft.horses).toHaveLength(7);
+    expect(draft.odds).toBeNull();
+    expect(notes.join()).toContain('未取得');
+  });
+
+  it('keeps per-pair time and source (template format) and uses them for the odds time', () => {
+    const v = structuredClone(received) as unknown as { sample: boolean; races: { wide_odds: Record<string, unknown> }[] };
+    v.sample = false;
+    v.races[0]!.wide_odds = {
+      ...v.races[0]!.wide_odds,
+      status: '取得済み',
+      is_mock: false,
+      pairs: [
+        { horse_number_1: 2, horse_number_2: 1, odds_min: 1.5, odds_max: 2.1, source_updated_at_jst: '2026-11-01T09:30:00+09:00', source_url: 'https://www.jra.go.jp/odds' },
+        { horse_number_1: 1, horse_number_2: 3, odds_min: 3.0, odds_max: 4.0, source_updated_at_jst: '2026-11-01T09:00:00+09:00', source_url: 'https://www.jra.go.jp/odds' },
+      ],
+    };
+    const f = parsed(v);
+    expect(f.races[0]!.wide!.pairs[0]).toMatchObject({ a: 1, b: 2, updatedAt: '2026-11-01T09:30:00+09:00' });
+    const { draft, notes } = feedRaceToDraft(f.races[0]!, f.tracks);
+    expect(draft.isDemo).toBe(false);
+    expect(draft.odds?.wide).toHaveLength(2);
+    expect(draft.odds?.asOf).toBe('2026-11-01T09:00:00+09:00');
+    expect(notes.join()).toContain('最も古い時点');
   });
 });
