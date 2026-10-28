@@ -120,7 +120,8 @@ export function itemStatus(d: Draft, key: ItemKey, now = Date.now()): DataItem['
   if (!hasData(d, key)) return 'missing';
   const src = d.sources.find((s) => s.id === item.sourceId);
   const limit = STALE_MINUTES[key];
-  const age = ageMinutes(src?.fetchedAt ?? null, now);
+  // The information time (asOf) decides freshness when known; otherwise the fetch time.
+  const age = ageMinutes(src?.asOf ?? src?.fetchedAt ?? null, now);
   if (limit !== null && age !== null && age > limit) return 'stale';
   return 'ok';
 }

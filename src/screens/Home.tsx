@@ -9,6 +9,9 @@ import { nowIso, todayJst } from '../domain/time';
 import { addImage, clearImages, deleteImage } from '../storage/db';
 import { navigate, useApp } from '../state';
 import { FieldError, Icon, OrbitVisual, StatusBadge } from '../ui/common';
+import { listFeedRaces } from '../storage/db';
+import type { FeedRace } from '../domain/feed';
+import { feedHref } from './Feed';
 
 export function Home() {
   const { draft, setDraft, images, reloadImages } = useApp();
@@ -122,6 +125,7 @@ export function Home() {
             </button>
           </div>
         )}
+        <FeedPicker />
       </div>
 
       <form
@@ -350,5 +354,43 @@ export function ImageList() {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Races from received data, as candidates to start from (real data only; samples live on the data screen). */
+function FeedPicker() {
+  const [races, setRaces] = useState<FeedRace[] | null>(null);
+  useEffect(() => {
+    listFeedRaces()
+      .then((all) => setRaces(all.filter((r) => !r.sample)))
+      .catch(() => setRaces([]));
+  }, []);
+  if (races === null) return null;
+  const today = todayJst();
+  const upcoming = races.filter((r) => r.date >= today).slice(0, 6);
+  return (
+    <div className="feed-pick">
+      {upcoming.length > 0 ? (
+        <>
+          <p className="subhead">受け取ったレースから選ぶ</p>
+          <ul>
+            {upcoming.map((r) => (
+              <li key={r.key}>
+                <a href={feedHref(r.key)}>
+                  <span>
+                    <span className="num">{r.date.slice(5).replace('-', '/')}</span> {r.venue}
+                    <span className="num">{r.number}R</span> {r.name}
+                  </span>
+                  <Icon name="arrow" />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      <a className="linkish" href="#/feed">
+        {races.length ? '受け取ったデータ（一覧・取り込み）' : '受け取ったJRAデータを取り込む'}
+      </a>
+    </div>
   );
 }
