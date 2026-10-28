@@ -1,10 +1,31 @@
 // Start an analysis draft from a received race. sample data becomes a 架空デモ draft (kept out of
 // real predictions and the ledger); mock wide odds are never carried into the draft.
 import { emptyDraft, emptyItems, type Draft } from './draft';
-import { formatRange, matchTrack, trackSummary, type FeedRace, type FeedTrack } from './feed';
+import { formatRange, matchTrack, trackSummary, type FeedRace, type FeedTrack, type PastRun } from './feed';
 import type { Source } from './schema';
 
-const na = (v: string | number | null, unit = '') => (v === null ? '未取得' : `${v}${unit}`);
+const na = (v: string | number | null | undefined, unit = '') => (v === null || v === undefined ? '未取得' : `${v}${unit}`);
+const q = (v: string | number | null | undefined, unit = '') => (v === null || v === undefined ? '?' : `${v}${unit}`);
+
+/** One past run as a compact line; unknown parts are shown as ? (never filled in). */
+export function pastRunLine(p: PastRun): string {
+  const fin = p.finish === null || p.finish === undefined ? '着順?' : typeof p.finish === 'number' ? `${p.finish}着` : p.finish;
+  return [
+    q(p.date),
+    q(p.venue),
+    `${q(p.race_name)}${p.class ? `（${p.class}）` : ''}`,
+    `${q(p.surface)}${q(p.distance_m, 'm')}`,
+    q(p.going),
+    `${q(p.field_size, '頭')}${q(p.horse_number, '番')}${q(p.popularity, '人気')}`,
+    fin,
+    `${q(p.time)}（${q(p.margin)}）`,
+    `通過${q(p.passing)}`,
+    `上がり${q(p.last_3f)}`,
+    `騎手${q(p.jockey)}`,
+    `斤量${q(p.weight_kg)}`,
+    `馬体重${q(p.body_weight_kg)}`,
+  ].join(' ');
+}
 
 export function feedRaceToDraft(race: FeedRace, tracks: FeedTrack[]): { draft: Draft; notes: string[] } {
   const demo = race.sample;
@@ -30,7 +51,10 @@ export function feedRaceToDraft(race: FeedRace, tracks: FeedTrack[]): { draft: D
   if (race.sourceUrl) sources.push(src('src-identity', 'レース同定', '受取データ（JRA出馬表）', race.sourceUrl, null));
 
   if (race.runners.length) {
-    const lines = race.runners.map((r) => `${r.horseNumber} ${r.name}　${na(r.sex)}${na(r.age)}歳　斤量${na(r.weightKg, 'kg')}　騎手：${na(r.jockey)}　枠${na(r.bracket)}`);
+    const lines = race.runners.map(
+      (r) =>
+        `${r.horseNumber} ${r.name}${r.scratched ? '（出走取消）' : ''}　${na(r.sex)}${na(r.age)}歳　斤量${na(r.weightKg, 'kg')}　騎手：${na(r.jockey)}　枠${na(r.bracket)}　単勝${na(r.winOdds)}（${na(r.popularity, '番人気')}）`,
+    );
     items.entries = {
       status: 'ok',
       sourceId: 'src-entries',
@@ -41,6 +65,8 @@ export function feedRaceToDraft(race: FeedRace, tracks: FeedTrack[]): { draft: D
   }
 
   let odds: Draft['odds'] = null;
+  const hid = (n: number) => `${prefix}${String(n).padStart(2, '0')}`;
+  const win = race.runners.filter((r) => r.winOdds !== null && !r.scratched).map((r) => ({ horseId: hid(r.horseNumber), odds: r.winOdds! }));
   const w = race.wide;
   if (w && !w.isMock && w.pairs.length) {
     const usable = w.pairs.filter((p) => p.min !== null && p.max !== null);
@@ -68,6 +94,32 @@ export function feedRaceToDraft(race: FeedRace, tracks: FeedTrack[]): { draft: D
     notes.push('ワイドオッズは未取得です。');
   }
 
+  if (win.length) {
+    // One odds time per snapshot: the older of 単勝 and ワイド, so freshness is never overstated.
+    const times = [race.winOddsUpdatedAt, odds?.asOf ?? null];
+    const asOf = !race.winOddsUpdatedAt || (odds && !odds.asOf) ? null : times.filter((t): t is string => Boolean(t)).sort()[0] ?? null;
+    if (odds && odds.asOf && race.winOddsUpdatedAt && odds.asOf !== race.winOddsUpdatedAt) notes.push('単勝とワイドのオッズ時点が異なります。古い方を基準にしています。');
+    if (!race.winOddsUpdatedAt) notes.push('単勝オッズの情報時点が不明です。');
+    odds = { asOf, sourceId: 'src-odds', win, wide: odds?.wide ?? [] };
+    items.odds = { status: 'ok', sourceId: 'src-odds', text: null, error: null };
+    const others = sources.filter((s) => s.id !== 'src-odds');
+    sources.length = 0;
+    sources.push(...others, src('src-odds', 'オッズ', '受取データ（単勝・ワイドオッズ）', race.winOddsSourceUrl ?? w?.sourceUrl ?? null, asOf));
+  }
+
+  const withPast = race.runners.filter((r) => r.pastRuns.length);
+  if (withPast.length) {
+    const blocks = withPast.map((r) => `${r.horseNumber} ${r.name}\n${r.pastRuns.map((p, i) => `  ${i + 1}走前：${pastRunLine(p)}`).join('\n')}`);
+    const noPast = race.runners.filter((r) => !r.pastRuns.length).map((r) => r.horseNumber);
+    items.past = {
+      status: 'ok',
+      sourceId: 'src-past',
+      text: `過去成績（新しい順・?は未取得。斤量は負担重量、馬体重は別項目）${noPast.length ? `\n過去成績なし／未取得：馬番 ${noPast.join('・')}` : ''}\n${blocks.join('\n')}`.slice(0, 60000),
+      error: null,
+    };
+    sources.push(src('src-past', '過去成績', '受取データ（JRA出馬表・過去成績）', race.sourceUrl, null));
+  }
+
   const m = matchTrack(tracks, race);
   if (m) {
     items.track = { status: 'ok', sourceId: 'src-track', text: trackSummary(m), error: null };
@@ -82,7 +134,7 @@ export function feedRaceToDraft(race: FeedRace, tracks: FeedTrack[]): { draft: D
     name: demo ? `${race.name}（テストデータ）` : race.name,
     venue: race.venue,
     number: String(race.number),
-    horses: race.runners.map((r) => ({ id: `${prefix}${String(r.horseNumber).padStart(2, '0')}`, number: r.horseNumber, name: r.name })),
+    horses: race.runners.map((r) => ({ id: `${prefix}${String(r.horseNumber).padStart(2, '0')}`, number: r.horseNumber, name: r.name, ...(r.scratched ? { scratched: true } : {}) })),
     sources,
     items,
     odds,

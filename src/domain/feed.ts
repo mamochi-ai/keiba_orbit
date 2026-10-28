@@ -20,6 +20,32 @@ const isoDate = z.iso.date({ message: '日付は YYYY-MM-DD 形式で指定し�
 const isoTime = z.iso.datetime({ offset: true, message: '日時はタイムゾーン付きISO形式（例 2026-10-23T12:00:00+09:00）で指定してください' });
 const odds = z.number().min(1).max(99999).nullable();
 
+const opt = <T extends z.ZodType>(t: T) => t.nullable().optional();
+
+/** One past run (前走〜4走前). Every field may be null = unknown. */
+const pastRunSchema = z.object({
+  date: opt(isoDate),
+  venue: opt(str(20)),
+  race_name: opt(str(80)),
+  class: opt(str(30)),
+  surface: opt(str(10)),
+  distance_m: opt(z.int().min(800).max(5000)),
+  going: opt(str(10)),
+  field_size: opt(z.int().min(1).max(30)),
+  horse_number: opt(z.int().min(1).max(30)),
+  popularity: opt(z.int().min(1).max(30)),
+  // A number, or text such as 「中止」「除外」「取消」.
+  finish: opt(z.union([z.int().min(1).max(30), str(10)])),
+  time: opt(str(12)),
+  margin: opt(str(12)),
+  passing: opt(str(30)),
+  last_3f: opt(z.number().min(20).max(60)),
+  jockey: opt(str(40)),
+  weight_kg: opt(z.number().min(40).max(70)),
+  body_weight_kg: opt(z.int().min(300).max(700)),
+});
+export type PastRun = z.infer<typeof pastRunSchema>;
+
 const runnerSchema = z.object({
   bracket: z.int().min(1).max(8).nullable(),
   horse_number: z.int().min(1).max(18),
@@ -28,6 +54,10 @@ const runnerSchema = z.object({
   age: z.int().min(1).max(20).nullable(),
   weight_kg: z.number().min(40).max(70).nullable(),
   jockey: str(40).nullable(),
+  scratched: opt(z.boolean()),
+  win_odds: opt(z.number().min(1).max(99999)),
+  popularity: opt(z.int().min(1).max(18)),
+  past_runs: z.array(pastRunSchema).max(10).optional(),
 });
 
 const pairSchema = z.object({
@@ -63,6 +93,8 @@ const raceSchema = z.object({
   source_url: url,
   runners: z.array(runnerSchema).max(18),
   wide_odds: wideSchema.nullable().optional(),
+  win_odds_updated_at_jst: opt(isoTime),
+  win_odds_source_url: url.optional(),
 });
 
 const sideSchema = z.object({ finish: z.number().min(0).max(100).nullable(), turn4: z.number().min(0).max(100).nullable() });
@@ -152,6 +184,12 @@ export interface FeedRunner {
   age: number | null;
   weightKg: number | null;
   jockey: string | null;
+  /** null = not stated. */
+  scratched: boolean | null;
+  winOdds: number | null;
+  popularity: number | null;
+  /** Newest first, as received (max 4 used). */
+  pastRuns: PastRun[];
   /** Fields that came from an earlier import because this import had null. */
   retained?: string[];
 }
@@ -208,6 +246,9 @@ export interface FeedRace {
   retainedFields?: string[];
   wide: FeedWide | null;
   previousWide?: FeedWide | null;
+  /** 単勝オッズの情報時点・出典 (race level). */
+  winOddsUpdatedAt: string | null;
+  winOddsSourceUrl: string | null;
   checkedOn: string | null;
   importedAt: string;
 }
@@ -310,6 +351,9 @@ export function parseFeed(value: unknown, importedAt: string): { ok: true; feed:
       continue;
     }
     seen.add(key);
+    const scratchedWithOdds = raw.runners.filter((ru) => ru.scratched && ru.win_odds != null).map((ru) => ru.horse_number);
+    if (scratchedWithOdds.length) issues.push({ level: 'warning', where, message: `出走取消の馬番 ${scratchedWithOdds.join('・')} に単勝オッズがあります。取消馬のオッズは使いません。` });
+    if (raw.runners.some((ru) => ru.win_odds != null) && !raw.win_odds_updated_at_jst) issues.push({ level: 'warning', where, message: '単勝オッズの情報時点（win_odds_updated_at_jst）がありません。時点不明として扱います。' });
 
     let wide: FeedWide | null = null;
     if (raw.wide_odds) {
@@ -368,9 +412,23 @@ export function parseFeed(value: unknown, importedAt: string): { ok: true; feed:
       entriesState: classifyStatus(raw.entries_status),
       sourceUrl: raw.source_url,
       runners: raw.runners
-        .map((ru) => ({ horseNumber: ru.horse_number, bracket: ru.bracket, name: ru.horse_name, sex: ru.sex, age: ru.age, weightKg: ru.weight_kg, jockey: ru.jockey }))
+        .map((ru) => ({
+          horseNumber: ru.horse_number,
+          bracket: ru.bracket,
+          name: ru.horse_name,
+          sex: ru.sex,
+          age: ru.age,
+          weightKg: ru.weight_kg,
+          jockey: ru.jockey,
+          scratched: ru.scratched ?? null,
+          winOdds: ru.win_odds ?? null,
+          popularity: ru.popularity ?? null,
+          pastRuns: (ru.past_runs ?? []).slice(0, 4),
+        }))
         .sort((a, b) => a.horseNumber - b.horseNumber),
       runnersCheckedOn: raw.runners.length ? f.checked_on_jst : null,
+      winOddsUpdatedAt: raw.win_odds_updated_at_jst ?? null,
+      winOddsSourceUrl: raw.win_odds_source_url ?? null,
       wide,
       checkedOn: f.checked_on_jst,
       importedAt,
@@ -439,6 +497,11 @@ export function mergeRace(existing: FeedRace | undefined, incoming: FeedRace): {
     race.distanceM = pickKeep(incoming.distanceM, existing.distanceM, '距離', retained);
     race.direction = pickKeep(incoming.direction, existing.direction, '回り', retained);
     race.sourceUrl = pickKeep(incoming.sourceUrl, existing.sourceUrl, '出馬表URL', retained);
+    // The time belongs to the odds values: keep the old time when no new 単勝 value arrived.
+    if (!incoming.runners.some((r) => r.winOdds !== null)) {
+      race.winOddsUpdatedAt = existing.winOddsUpdatedAt ?? null;
+      race.winOddsSourceUrl = existing.winOddsSourceUrl ?? null;
+    }
 
     if (incoming.runners.length === 0 && existing.runners.length > 0) {
       race.runners = existing.runners;
@@ -458,6 +521,10 @@ export function mergeRace(existing: FeedRace | undefined, incoming: FeedRace): {
           age: pickKeep(ru.age, old.age, '年齢', r),
           weightKg: pickKeep(ru.weightKg, old.weightKg, '斤量', r),
           jockey: pickKeep(ru.jockey, old.jockey, '騎手', r),
+          scratched: pickKeep(ru.scratched, old.scratched ?? null, '取消', r),
+          winOdds: pickKeep(ru.winOdds, old.winOdds ?? null, '単勝オッズ', r),
+          popularity: pickKeep(ru.popularity, old.popularity ?? null, '人気', r),
+          pastRuns: ru.pastRuns.length ? ru.pastRuns : (old.pastRuns?.length ? (r.push('過去成績'), old.pastRuns) : []),
           ...(r.length ? { retained: r } : {}),
         };
       });
@@ -565,4 +632,20 @@ export function trackSummary(m: TrackMatch): string {
   if (t.warning) lines.push(`注意：${t.warning}`);
   if (t.retainedFields?.length) lines.push(`前回の取込から維持した項目：${t.retainedFields.join('・')}`);
   return lines.join('\n');
+}
+
+/** Fill fields added after a race was stored (older imports), so every reader sees one shape. */
+export function normalizeStoredRace(r: FeedRace): FeedRace {
+  return {
+    ...r,
+    winOddsUpdatedAt: r.winOddsUpdatedAt ?? null,
+    winOddsSourceUrl: r.winOddsSourceUrl ?? null,
+    runners: r.runners.map((ru) => ({
+      ...ru,
+      scratched: ru.scratched ?? null,
+      winOdds: ru.winOdds ?? null,
+      popularity: ru.popularity ?? null,
+      pastRuns: ru.pastRuns ?? [],
+    })),
+  };
 }
