@@ -312,6 +312,19 @@ const receivedFeed = JSON.parse(readFileSync(new URL('../src/test/feed-received-
 await importFeed(receivedFeed);
 const s4 = await fp.locator('[role=status]').first().innerText();
 check('feed: received 2026-10-28 file imports (no is_mock, doc fields ignored with notice)', s4.includes('出走馬 7頭') && s4.includes('wide_odds_record_template') && s4.includes('claude_code_instructions'), s4);
+const extendedFeed = JSON.parse(readFileSync(new URL('../src/test/feed-extended-example.json', import.meta.url), 'utf8'));
+await importFeed(extendedFeed);
+await fp.locator('section:has(#feed-sample) .saved-item a', { hasText: 'テスト記念' }).click();
+await fp.getByRole('heading', { name: /テスト記念/ }).waitFor();
+check('feed extended: 単勝・人気・取消・過去成績 shown', (await fp.locator('.win-odds').first().innerText()).includes('3.2') && (await fp.getByText('出走取消').first().isVisible()) && (await fp.locator('.past-runs').count()) === 1);
+await fp.locator('.past-runs summary').first().click();
+check('feed extended: past run line', (await fp.locator('.past-runs').first().innerText()).includes('上がり33.8'));
+for (const w of [390, 1024]) {
+  await fp.setViewportSize({ width: w, height: 844 });
+  const o = await fp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  check(`feed extended: no horizontal overflow at ${w}px`, o <= 0, `overflow=${o}`);
+  if (shots) await fp.screenshot({ path: `${shots}/feed-extended-${w}.png`, fullPage: true });
+}
 await feedCtx.close();
 
 // Empty states in a fresh browser profile

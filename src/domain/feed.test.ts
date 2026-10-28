@@ -2,6 +2,8 @@ import 'fake-indexeddb/auto';
 import { describe, expect, it } from 'vitest';
 import sample from '../test/feed-sample.json';
 import received from '../test/feed-received-2026-10-28.json';
+import extended from '../test/feed-extended-example.json';
+import { normalizeStoredRace } from './feed';
 import { formatRange, matchTrack, mergeRace, parseFeed, type FeedRace } from './feed';
 import { feedRaceToDraft } from './feedDraft';
 import { applyFeed, listFeedRaces, listFeedTracks } from '../storage/db';
@@ -190,5 +192,67 @@ describe('received JRA data (schema 1.0)', () => {
     expect(draft.odds?.wide).toHaveLength(2);
     expect(draft.odds?.asOf).toBe('2026-11-01T09:00:00+09:00');
     expect(notes.join()).toContain('最も古い時点');
+  });
+
+  it('extended format: past runs, 単勝オッズ・人気, 出走取消', () => {
+    const f = parsed(extended);
+    const race = f.races[0]!;
+    expect(race.winOddsUpdatedAt).toBe('2026-10-31T20:55:00+09:00');
+    expect(race.runners[0]).toMatchObject({ winOdds: 3.2, popularity: 1, scratched: false });
+    expect(race.runners[0]!.pastRuns).toHaveLength(2);
+    expect(race.runners[2]).toMatchObject({ scratched: true, winOdds: null });
+    expect(race.runners[3]).toMatchObject({ scratched: null, winOdds: null, pastRuns: [] });
+
+    const asReal = { ...race, sample: false };
+    const { draft, notes } = feedRaceToDraft(asReal, f.tracks);
+    expect(draft.horses.find((h) => h.number === 3)?.scratched).toBe(true);
+    expect(draft.odds?.win).toEqual([
+      { horseId: 'h01', odds: 3.2 },
+      { horseId: 'h02', odds: 5.8 },
+    ]);
+    expect(draft.odds?.wide).toHaveLength(3);
+    expect(draft.odds?.asOf).toBe('2026-10-31T20:50:00+09:00'); // older of 単勝 20:55 and ワイド 20:50
+    expect(notes.join()).toContain('古い方を基準');
+    const past = draft.items.past.text!;
+    expect(past).toContain('1 テストアルファ');
+    expect(past).toContain('1走前：2026-09-28 中山 架空特別（3勝クラス） 芝1600m 良 16頭3番2人気 1着 1:33.4（0.2） 通過3-3 上がり33.8');
+    expect(past).toContain('中止 ?（?）'); // unknown values stay unknown
+    expect(past).toContain('過去成績なし／未取得：馬番 2・3・4');
+    expect(draft.items.entries.text).toContain('テストチャーリー（出走取消）');
+    expect(parseSnapshot(buildSnapshot(asReal.sample ? draft : draft)).ok).toBe(true);
+  });
+
+  it('warns about a scratched horse with odds and odds without a time', () => {
+    const v = structuredClone(extended) as unknown as { races: { win_odds_updated_at_jst: string | null; runners: Record<string, unknown>[] }[] };
+    v.races[0]!.runners[2]!.win_odds = 9.9;
+    v.races[0]!.win_odds_updated_at_jst = null;
+    const msgs = parsed(v).issues.map((i) => i.message).join();
+    expect(msgs).toContain('出走取消の馬番 3 に単勝オッズ');
+    expect(msgs).toContain('情報時点');
+  });
+
+  it('a partial re-import keeps past runs and 単勝 values with their earlier time', () => {
+    const first = parsed(extended).races[0]!;
+    const v = structuredClone(extended) as unknown as { races: { win_odds_updated_at_jst: string | null; runners: Record<string, unknown>[] }[] };
+    for (const r of v.races[0]!.runners) {
+      r.win_odds = null;
+      r.past_runs = [];
+    }
+    v.races[0]!.win_odds_updated_at_jst = null;
+    const { race } = mergeRace(first, parsed(v).races[0]!);
+    expect(race.runners[0]).toMatchObject({ winOdds: 3.2 });
+    expect(race.runners[0]!.pastRuns).toHaveLength(2);
+    expect(race.runners[0]!.retained).toEqual(expect.arrayContaining(['単勝オッズ', '過去成績']));
+    expect(race.winOddsUpdatedAt).toBe('2026-10-31T20:55:00+09:00');
+  });
+
+  it('races stored before the extension are read with empty new fields', () => {
+    const old = parsed(sample).races[0]!;
+    const legacy = { ...old, runners: old.runners.map(({ scratched: _s, winOdds: _w, popularity: _p, pastRuns: _r, ...rest }) => rest) } as unknown as FeedRace;
+    delete (legacy as Partial<FeedRace>).winOddsUpdatedAt;
+    const n = normalizeStoredRace(legacy);
+    expect(n.runners[0]).toMatchObject({ scratched: null, winOdds: null, popularity: null, pastRuns: [] });
+    expect(n.winOddsUpdatedAt).toBeNull();
+    expect(() => feedRaceToDraft(n, [])).not.toThrow();
   });
 });

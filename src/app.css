@@ -433,3 +433,9 @@ input::-webkit-date-and-time-value { min-height: 24px; line-height: 24px; }
 .feed-pick li a { display: flex; justify-content: space-between; gap: 10px; align-items: center; min-height: 48px; padding: 6px 0; border-bottom: 1px solid var(--line); color: var(--ink); text-decoration: none; }
 .feed-pick li a:hover { background: var(--surface); }
 .pair-time { display: block; margin: 0; font-size: 12px; text-align: right; }
+.feed-runner { grid-template-columns: 44px minmax(0, 1fr) auto; align-items: start; }
+.feed-runner.is-scratched b { text-decoration: line-through; color: var(--muted); }
+.win-odds { text-align: right; font-size: 17px; font-weight: 600; }
+.win-odds .hint { display: block; margin: 0; font-size: 12px; font-weight: 400; }
+.past-runs summary { min-height: 44px; display: flex; align-items: center; color: var(--cyan); cursor: pointer; font-size: 15px; }
+.past-runs li { font-size: 14px; padding: 4px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }

@@ -2,7 +2,7 @@
 // one); settlements, note articles and draft images live in their own stores.
 import type { Draft } from '../domain/draft';
 import type { SavedAnalysis, Settlement } from '../domain/schema';
-import { mergeRace, mergeTrack, type FeedIssue, type FeedRace, type FeedTrack, type ParsedFeed } from '../domain/feed';
+import { mergeRace, mergeTrack, normalizeStoredRace, type FeedIssue, type FeedRace, type FeedTrack, type ParsedFeed } from '../domain/feed';
 
 const DB_NAME = 'keiba-orbit';
 const DB_VERSION = 2;
@@ -156,12 +156,13 @@ export async function clearAll(): Promise<void> {
 /* ---------------- Received data (受取データ) ---------------- */
 
 export async function listFeedRaces(): Promise<FeedRace[]> {
-  const all = (await wrap((await store('feedRaces', 'readonly')).getAll())) as FeedRace[];
+  const all = ((await wrap((await store('feedRaces', 'readonly')).getAll())) as FeedRace[]).map(normalizeStoredRace);
   return all.sort((a, b) => a.date.localeCompare(b.date) || a.venue.localeCompare(b.venue) || a.number - b.number);
 }
 
 export async function getFeedRace(key: string): Promise<FeedRace | undefined> {
-  return (await wrap((await store('feedRaces', 'readonly')).get(key))) as FeedRace | undefined;
+  const r = (await wrap((await store('feedRaces', 'readonly')).get(key))) as FeedRace | undefined;
+  return r ? normalizeStoredRace(r) : undefined;
 }
 
 export async function listFeedTracks(): Promise<FeedTrack[]> {
@@ -186,7 +187,8 @@ export async function applyFeed(feed: ParsedFeed): Promise<FeedApplyResult> {
   const tracks = tx.objectStore('feedTracks');
   const result: FeedApplyResult = { added: 0, updated: 0, runners: 0, pairs: 0, mockPairs: 0, tracks: 0, issues: [...feed.issues] };
   for (const incoming of feed.races) {
-    const existing = (await wrap(races.get(incoming.key))) as FeedRace | undefined;
+    const stored = (await wrap(races.get(incoming.key))) as FeedRace | undefined;
+    const existing = stored ? normalizeStoredRace(stored) : undefined;
     const { race, issues } = mergeRace(existing, incoming);
     races.put(race);
     if (existing) result.updated++;

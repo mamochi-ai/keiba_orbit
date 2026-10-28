@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
 import { FEED_STATE_LABEL, formatRange, matchTrack, parseFeed, trackSummary, type FeedRace, type FeedTrack, type FeedWide } from '../domain/feed';
-import { feedRaceToDraft } from '../domain/feedDraft';
+import { feedRaceToDraft, pastRunLine } from '../domain/feedDraft';
 import { findJsonError } from '../domain/parse';
 import { formatDateJa, formatJst, nowIso } from '../domain/time';
 import { applyFeed, clearSampleFeed, deleteFeedRace, getFeedRace, listFeedRaces, listFeedTracks, type FeedApplyResult } from '../storage/db';
@@ -390,20 +390,44 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
         ) : (
           <ol className="plain feed-runners">
             {race.runners.map((r) => (
-              <li key={r.horseNumber} className="feed-runner">
+              <li key={r.horseNumber} className={`feed-runner ${r.scratched ? 'is-scratched' : ''}`}>
                 <span className="rank-no">{String(r.horseNumber).padStart(2, '0')}</span>
                 <span>
-                  <b>{r.name}</b>
+                  <b>{r.name}</b> {r.scratched && <span className="badge error">出走取消</span>}
                   <span className="hint" style={{ display: 'block', margin: 0 }}>
                     {r.sex ?? '性未取得'}
                     {r.age ?? '?'}歳／斤量 {r.weightKg !== null ? `${r.weightKg}kg` : '未取得'}／{r.jockey ?? '騎手未取得'}／枠 {r.bracket ?? '未取得'}
                     {r.retained?.length ? `（前回の値：${r.retained.join('・')}）` : ''}
                   </span>
+                  {(r.pastRuns?.length ?? 0) > 0 && (
+                    <details className="past-runs">
+                      <summary>過去成績 {r.pastRuns.length}走</summary>
+                      <ol className="plain">
+                        {r.pastRuns.map((p, i) => (
+                          <li key={i}>
+                            <span className="muted">{i + 1}走前</span> {pastRunLine(p)}
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  )}
+                </span>
+                <span className="win-odds num">
+                  {r.scratched ? '—' : r.winOdds !== null && r.winOdds !== undefined ? r.winOdds.toFixed(1) : '未取得'}
+                  <span className="hint">{r.popularity ? `${r.popularity}番人気` : '単勝'}</span>
                 </span>
               </li>
             ))}
           </ol>
         )}
+        <p className="hint">
+          単勝オッズの時点：{race.winOddsUpdatedAt ? formatJst(race.winOddsUpdatedAt) : '不明'}（最終オッズではありません）
+          {race.winOddsSourceUrl && (
+            <>
+              ／出典：<SafeLink href={race.winOddsSourceUrl} />
+            </>
+          )}
+        </p>
         <p className="hint">斤量は負担重量で、馬体重ではありません。出典：<SafeLink href={race.sourceUrl} /></p>
       </section>
 
