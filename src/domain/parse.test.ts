@@ -55,3 +55,24 @@ describe('stripOuterFence', () => {
     expect(stripOuterFence('# no fence').stripped).toBe(false);
   });
 });
+
+describe('truncated replies', () => {
+  it('flags JSON that simply stops (cut-off Claude reply), with or without a trailing newline', () => {
+    for (const t of ['{"a":[1,2', '{"a":{"b":"x"', '{"schemaVersion":1,"horses":[{"id":"h01","sourceIds":["src-past"\n', '```json\n{"a":[1\n```']) {
+      const r = parsePastedJson(t);
+      expect(r.ok, t).toBe(false);
+      if (!r.ok) {
+        expect(r.truncated, t).toBe(true);
+        expect(r.message).toContain('途中で終わっています');
+      }
+    }
+  });
+
+  it('does not call ordinary syntax errors truncated', () => {
+    for (const t of ['{"a":1,}', '{"a": tru, "b": 1}', '{"a":1}\n以上です']) {
+      const r = parsePastedJson(t);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.truncated ?? false, t).toBe(false);
+    }
+  });
+});

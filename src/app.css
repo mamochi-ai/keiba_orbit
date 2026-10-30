@@ -207,7 +207,9 @@ footer.app-foot { margin-top: 40px; padding-top: 18px; border-top: 1px solid var
 .item-meta { grid-column: 1 / -1; color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
 .item-body { padding: 4px 4px 22px; display: grid; gap: 14px; }
 .item-body > * { margin-top: 0; }
-.card-import { border-left: 2px solid var(--cyan); padding-left: 12px; margin-bottom: 0; background: linear-gradient(90deg, rgba(100, 237, 255, .05), transparent 60%); }
+.card-import .item-label { font-size: 16px; color: var(--text-2); }
+.feed-hint { display: grid; gap: 10px; justify-items: start; padding: 12px 14px; margin: 0 0 14px; background: var(--surface); border-left: 3px solid var(--cyan); border-radius: 0 8px 8px 0; }
+.feed-hint p { margin: 0; }
 .card-preview { padding-top: 14px; border-top: 1px solid var(--line); display: grid; gap: 12px; }
 .card-preview h3 { font-size: 17px; }
 .subgroup { border-top: 1px solid var(--line); padding-top: 10px; }

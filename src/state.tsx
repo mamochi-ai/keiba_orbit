@@ -5,17 +5,34 @@ import { loadDraft, saveDraft, listImages, type StoredImage } from './storage/db
 
 export interface Settings {
   weatherEnabled: boolean;
+  /** Where 「Claudeを開く」 goes: a new chat by default, or the user's own chat / project on claude.ai. */
+  claudeUrl: string;
+}
+
+export const DEFAULT_CLAUDE_URL = 'https://claude.ai/new';
+
+/** Only https links on claude.ai (no other sites, no credentials in the URL). */
+export function isClaudeUrl(value: string): boolean {
+  try {
+    const u = new URL(value);
+    return u.protocol === 'https:' && u.hostname === 'claude.ai' && !u.username && !u.password && value.length <= 500;
+  } catch {
+    return false;
+  }
 }
 
 const SETTINGS_KEY = 'keiba-orbit:settings';
-const defaultSettings: Settings = { weatherEnabled: true };
+const defaultSettings: Settings = { weatherEnabled: true, claudeUrl: DEFAULT_CLAUDE_URL };
 
 function readSettings(): Settings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (!raw) return defaultSettings;
     const v = JSON.parse(raw) as Partial<Settings>;
-    return { weatherEnabled: typeof v.weatherEnabled === 'boolean' ? v.weatherEnabled : true };
+    return {
+      weatherEnabled: typeof v.weatherEnabled === 'boolean' ? v.weatherEnabled : true,
+      claudeUrl: typeof v.claudeUrl === 'string' && isClaudeUrl(v.claudeUrl) ? v.claudeUrl : DEFAULT_CLAUDE_URL,
+    };
   } catch {
     return defaultSettings;
   }

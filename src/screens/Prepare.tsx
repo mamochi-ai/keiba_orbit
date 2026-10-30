@@ -5,8 +5,8 @@ import { ITEM_KEYS, ITEM_LABELS, ITEM_TEXT_LIMITS, isSafeHttpUrl, type ItemKey, 
 import { parseSnapshot } from '../domain/validate';
 import { formatDateJa, formatJst, isoToJstLocal, jstLocalToIso, nowIso } from '../domain/time';
 import { fetchWeather, WEATHER_PROVIDER } from '../data/weather';
-import { navigate, useApp } from '../state';
-import { CLAUDE_URL, CopyButton, EmptyState, Icon, SafeLink, StatusBadge } from '../ui/common';
+import { DEFAULT_CLAUDE_URL, navigate, useApp } from '../state';
+import { CopyButton, EmptyState, Icon, OpenClaudeLink, SafeLink, StatusBadge } from '../ui/common';
 import { CardImport } from './CardImport';
 import { CopyGuide } from '../ui/CopyGuide';
 
@@ -20,7 +20,7 @@ const HINTS: Record<ItemKey, string> = {
 };
 
 export function Prepare() {
-  const { draft, setDraft, images } = useApp();
+  const { draft, setDraft, images, settings } = useApp();
   const homeErrors = validateHome(draft);
   const snapshotRef = useRef<RaceSnapshot | null>(null);
   // Bumped after the 出馬表 import so the item editors re-read the draft.
@@ -95,11 +95,21 @@ export function Prepare() {
             </h2>
             <span className="sec-note">開くと出典・取得時刻・入力欄を表示</span>
           </div>
+          {draft.horses.length === 0 && !draft.isDemo && (
+            <div className="feed-hint" role="note">
+              <p>
+                <b>出走表がまだありません。</b>受け取ったデータからレースを選ぶと、出走表・オッズ・過去成績・馬場がまとめて入ります。
+              </p>
+              <a className="btn primary small" href="#/feed">
+                受け取ったデータからレースを選ぶ <Icon name="arrow" />
+              </a>
+            </div>
+          )}
           <div className="data-list">
-            <CardImport onApplied={() => setRev((r) => r + 1)} />
             {ITEM_KEYS.filter((k) => k !== 'identity').map((k) => (
               <ItemEditor key={`${k}-${rev}`} itemKey={k} />
             ))}
+            <CardImport onApplied={() => setRev((r) => r + 1)} />
           </div>
         </section>
 
@@ -148,10 +158,8 @@ export function Prepare() {
                 <span className="step-no">2</span>
                 <span className="step-title">Claudeで分析</span>
                 <div className="step-body">
-                  <a className={`btn ${step === 2 ? 'primary' : ''}`} href={CLAUDE_URL} target="_blank" rel="noopener noreferrer" onClick={() => setOpened(true)}>
-                    Claudeを開く <Icon name="external" />
-                  </a>
-                  <p className="hint">新しいチャットに貼り付けて送信します。{images.length > 0 && `参考画像${images.length}枚はここで添付してください。`}</p>
+                  <OpenClaudeLink primary={step === 2} onOpen={() => setOpened(true)} />
+                  <p className="hint">{settings.claudeUrl === DEFAULT_CLAUDE_URL ? '新しいチャットに' : '設定したチャットに'}貼り付けて送信します。{images.length > 0 && `参考画像${images.length}枚はここで添付してください。`}</p>
                 </div>
               </li>
               <li className={stepClass(3)} aria-current={step === 3 ? 'step' : undefined}>
@@ -209,7 +217,6 @@ function ItemEditor({ itemKey }: { itemKey: ItemKey }) {
   const [errors, setErrors] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [initiallyOpen] = useState(itemKey === 'entries' && status === 'missing');
 
   function apply() {
     setSaved(false);
@@ -311,8 +318,9 @@ function ItemEditor({ itemKey }: { itemKey: ItemKey }) {
         ? '開催日と競馬場を確認すると取得できます'
         : null;
 
+  // Rows start closed; received data (受け取ったデータ) is the main way to fill them.
   return (
-    <details className="item" open={initiallyOpen}>
+    <details className="item">
       <summary className="item-head">
         <span className="item-label">{ITEM_LABELS[itemKey]}</span>
         <StatusBadge status={status} />

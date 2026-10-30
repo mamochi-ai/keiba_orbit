@@ -13,7 +13,7 @@ import { betLabel, PayoutLine, STATUS_LABELS } from './reportParts';
 export function Paste() {
   const { draft, setDraft } = useApp();
   const [text, setText] = useState('');
-  const [parseError, setParseError] = useState<{ message: string; line?: number } | null>(null);
+  const [parseError, setParseError] = useState<{ message: string; line?: number; truncated?: boolean } | null>(null);
   const [check, setCheck] = useState<ResponseCheck | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export function Paste() {
     setSaveError(null);
     const p = parsePastedJson(text);
     if (!p.ok) {
-      setParseError({ message: p.message, line: p.line });
+      setParseError({ message: p.message, line: p.line, truncated: p.truncated });
       return;
     }
     setParseError(null);
@@ -125,7 +125,24 @@ export function Paste() {
         {parseError && (
           <div id="paste-error" className="error-box" role="alert">
             <p>{parseError.message}</p>
-            {parseError.line !== undefined && <ErrorLine text={text} line={parseError.line} />}
+            {parseError.truncated ? (
+              <div className="truncated-help">
+                <p>
+                  <b>Claudeの応答が途中で切れています。</b>次のどちらかで直せます。
+                </p>
+                <ol className="guide-steps">
+                  <li>
+                    Claudeに「続きを、前の出力の最後の文字の直後からそのまま出力してください」と送り、出てきた続きをこの欄の最後に貼り足して、もう一度「読み込んで確認」。
+                  </li>
+                  <li>
+                    Claudeに「JSONが長すぎて途中で切れました。horses は注目する馬5頭まで、reasons と concerns は各2件まで、各文は短くして、JSONだけを最初から出力し直してください」と送り、新しい応答を貼り直す。
+                  </li>
+                </ol>
+                <p className="hint">Claudeがまだ書いている途中でコピーした場合も、こうなります。応答が終わってからコピーしてください。</p>
+              </div>
+            ) : (
+              parseError.line !== undefined && <ErrorLine text={text} line={parseError.line} />
+            )}
           </div>
         )}
       </section>

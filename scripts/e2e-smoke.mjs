@@ -208,7 +208,10 @@ await r.getByRole('heading', { name: /分析準備/ }).waitFor();
 // 出馬表 paste → entries, win odds and past performances in one go
 const card = ['出馬表 2026年11月1日（日曜）4回東京9日 11レース', ...Array.from({ length: 10 }, (_, i) =>
   `枠${Math.min(8, i + 1)}${'白黒赤青黄緑橙桃'[Math.min(7, i)]}\t${i + 1}\tテスト${'アイウエオカキクケコ'[i]}\n${i === 0 ? '3.2' : (5 + i).toFixed(1)} (${i + 1} 番人気 )\n\t牡4/鹿\t2026年9月1日\n中山\n${i + 1} 着`)].join('\n');
+check('prep: empty entries point to received data', await r.getByRole('link', { name: /受け取ったデータからレースを選ぶ/ }).isVisible());
 const cardPanel = r.locator('details.card-import');
+check('prep: backup card import is closed by default', (await cardPanel.getAttribute('open')) === null);
+await cardPanel.locator('summary.item-head').click();
 await cardPanel.getByLabel('出馬表ページのテキスト').fill(card);
 await cardPanel.getByRole('button', { name: '読み取る' }).click();
 check('card import: preview lists 10 horses', (await cardPanel.locator('.runner-list li').count()) === 10);
@@ -326,6 +329,29 @@ for (const w of [390, 1024]) {
   if (shots) await fp.screenshot({ path: `${shots}/feed-extended-${w}.png`, fullPage: true });
 }
 await feedCtx.close();
+
+// Claude link setting and cut-off replies
+const cl = await browser.newContext({ viewport: { width: 1024, height: 900 } });
+const cp = await cl.newPage();
+await cp.goto(base + '#/settings');
+await cp.getByLabel(/開き先のURL/).fill('https://example.com/chat');
+await cp.getByRole('button', { name: '保存', exact: true }).click();
+check('settings: non-claude.ai URL rejected', (await cp.locator('#claude-target ~ * .error-text, section:has(#claude-target) .error-text').innerText()).includes('https://claude.ai/'));
+await cp.getByLabel(/開き先のURL/).fill('https://claude.ai/project/keiba-ai-test');
+await cp.getByRole('button', { name: '保存', exact: true }).click();
+await cp.goto(base);
+await cp.waitForSelector('button.btn');
+await cp.getByRole('button', { name: '架空デモで試す' }).click();
+await cp.waitForURL(/prepare/);
+check('prep: Claude link opens the saved chat', (await cp.getByRole('link', { name: /Claudeを開く/ }).getAttribute('href')) === 'https://claude.ai/project/keiba-ai-test');
+await cp.getByLabel('分析対象と情報締切を確認しました').check();
+await cp.getByRole('button', { name: '分析用コピー' }).click().catch(() => {});
+await cp.waitForTimeout(300);
+await cp.getByRole('button', { name: '結果を貼り付け' }).click();
+await cp.getByLabel(/Claudeの応答/).fill('{"schemaVersion":1,"horses":[{"id":"h01","sourceIds":["src-past"\n');
+await cp.getByRole('button', { name: '読み込んで確認' }).click();
+check('paste: cut-off reply explained', (await cp.locator('#paste-error').innerText()).includes('途中で切れています'));
+await cl.close();
 
 // Empty states in a fresh browser profile
 const fresh = await browser.newContext({ viewport: { width: 390, height: 844 } });

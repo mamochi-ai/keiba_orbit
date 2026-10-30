@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { emptyDraft } from '../domain/draft';
 import { clearAll } from '../storage/db';
-import { useApp } from '../state';
+import { DEFAULT_CLAUDE_URL, isClaudeUrl, useApp } from '../state';
 import { CopyGuide } from '../ui/CopyGuide';
 
 const SOURCES: { item: string; state: string; how: string }[] = [
@@ -58,6 +58,8 @@ export function SettingsScreen() {
               <li>SNS・掲示板の情報は使いません。</li>
             </ul>
           </section>
+
+          <ClaudeTarget />
 
           <section className="sec" aria-labelledby="ds">
             <div className="sec-head">
@@ -125,5 +127,72 @@ export function SettingsScreen() {
         </aside>
       </div>
     </>
+  );
+}
+
+/** Which Claude chat 「Claudeを開く」 opens. */
+function ClaudeTarget() {
+  const { settings, setSettings } = useApp();
+  const [url, setUrl] = useState(settings.claudeUrl === DEFAULT_CLAUDE_URL ? '' : settings.claudeUrl);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const custom = settings.claudeUrl !== DEFAULT_CLAUDE_URL;
+
+  function save() {
+    const v = url.trim();
+    if (!isClaudeUrl(v)) {
+      setMsg({ ok: false, text: 'https://claude.ai/ で始まるURLを入れてください。' });
+      return;
+    }
+    setSettings({ ...settings, claudeUrl: v });
+    setMsg({ ok: true, text: '保存しました。「Claudeを開く」でこのチャットが開きます。' });
+  }
+
+  return (
+    <section className="sec" aria-labelledby="claude-target">
+      <div className="sec-head">
+        <span className="tag">Claude</span>
+        <h2 id="claude-target" className="sec-title">
+          Claudeの開き先
+        </h2>
+      </div>
+      <p className="muted">
+        「Claudeを開く」で開くチャットです。いまは{custom ? '設定したチャット' : '毎回新しいチャット'}を開きます。「競馬予想AI」など決まったチャットやプロジェクトを使う場合は、そのURLを保存してください。
+      </p>
+      <ol className="guide-steps">
+        <li>Safariで claude.ai を開き、使いたいチャット（またはプロジェクト）を表示する。</li>
+        <li>アドレスバーをタップしてURLを長押し →「コピー」。</li>
+        <li>下に貼り付けて「保存」。</li>
+      </ol>
+      <label>
+        開き先のURL（https://claude.ai/ で始まるもの）
+        <input type="url" inputMode="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://claude.ai/project/… または https://claude.ai/chat/…" />
+      </label>
+      <div className="row mt">
+        <button type="button" className="btn primary small" onClick={save} disabled={!url.trim()}>
+          保存
+        </button>
+        {custom && (
+          <button
+            type="button"
+            className="btn ghost small"
+            onClick={() => {
+              setSettings({ ...settings, claudeUrl: DEFAULT_CLAUDE_URL });
+              setUrl('');
+              setMsg({ ok: true, text: '新しいチャットを開く設定に戻しました。' });
+            }}
+          >
+            新しいチャットに戻す
+          </button>
+        )}
+      </div>
+      {msg && (
+        <p className={msg.ok ? 'ok-text' : 'error-text'} role={msg.ok ? 'status' : 'alert'}>
+          {msg.text}
+        </p>
+      )}
+      <p className="hint">
+        同じチャットに何レースも続けて貼ると、前のやり取りが長くなり、応答が途中で切れやすくなります。プロジェクトの中で、レースごとに新しいチャットを始める使い方がおすすめです。
+      </p>
+    </section>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { isSafeHttpUrl, type ItemStatus } from '../domain/schema';
+import { useApp } from '../state';
 
 export type IconName =
   | 'arrow' | 'calendar' | 'check' | 'close' | 'cloud-rain' | 'copy' | 'external' | 'history'
@@ -45,11 +46,11 @@ export function SafeLink({ href, children }: { href: string | null; children?: R
   );
 }
 
-export const CLAUDE_URL = 'https://claude.ai/new';
-
-export function OpenClaudeLink() {
+/** Opens the Claude chat chosen in 設定 (a new chat unless the user saved their own). */
+export function OpenClaudeLink({ primary = false, onOpen }: { primary?: boolean; onOpen?: () => void }) {
+  const { settings } = useApp();
   return (
-    <a className="btn" href={CLAUDE_URL} target="_blank" rel="noopener noreferrer">
+    <a className={`btn ${primary ? 'primary' : ''}`} href={settings.claudeUrl} target="_blank" rel="noopener noreferrer" onClick={onOpen}>
       Claudeを開く <Icon name="external" />
     </a>
   );
