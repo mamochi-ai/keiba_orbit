@@ -3,6 +3,7 @@ import { computeTotals, estimateBet, formatYen, sharedHorseDependencies, type Pa
 import { SCENARIO_IDS, SCENARIO_LABELS, type AnalysisResponse, type Bet, type RaceSnapshot, type ScenarioId } from '../domain/schema';
 import { horseLabel } from '../domain/validate';
 import { formatJst } from '../domain/time';
+import { humanizeIds, splitSummary } from '../domain/reportText';
 import { EmptyState, Icon } from '../ui/common';
 
 export const STATUS_LABELS: Record<AnalysisResponse['status'], string> = {
@@ -99,7 +100,7 @@ export function Candidates({ snapshot, response }: { snapshot: RaceSnapshot; res
                     {info?.reasons.length ? (
                       <ul>
                         {info.reasons.map((r, i) => (
-                          <li key={i}>{r}</li>
+                          <li key={i}>{humanizeIds(r, snapshot)}</li>
                         ))}
                       </ul>
                     ) : (
@@ -111,7 +112,7 @@ export function Candidates({ snapshot, response }: { snapshot: RaceSnapshot; res
                     {info?.concerns.length ? (
                       <ul>
                         {info.concerns.map((r, i) => (
-                          <li key={i}>{r}</li>
+                          <li key={i}>{humanizeIds(r, snapshot)}</li>
                         ))}
                       </ul>
                     ) : (
@@ -209,10 +210,10 @@ export function ScenarioCompare({
             {scenario !== 'base' && (
               <div className="change-reason">
                 <span className="label">{changed ? '評価順が変わった理由' : 'この条件での見立て'}</span>
-                <p>{sc!.reason || '理由の記載がありません（順位の変化だけで判断しないでください）。'}</p>
+                <p>{sc!.reason ? humanizeIds(sc!.reason, snapshot) : '理由の記載がありません（順位の変化だけで判断しないでください）。'}</p>
               </div>
             )}
-            {scenario === 'base' && sc!.reason && <p className="muted" style={{ marginTop: 14 }}>{sc!.reason}</p>}
+            {scenario === 'base' && sc!.reason && <p className="muted" style={{ marginTop: 14 }}>{humanizeIds(sc!.reason, snapshot)}</p>}
             <ol className="ranking" aria-live="polite">
               {sc!.order.map((id, i) => {
                 const h = snapshot.horses.find((x) => x.id === id);
@@ -322,7 +323,7 @@ export function BudgetPanel({ snapshot, response }: { snapshot: RaceSnapshot; re
                 {betLabel(snapshot, b)}
               </span>
               <span className="bet-amount">{formatYen(b.amount)}</span>
-              <span className="bet-reason">{b.reason || '理由の記載なし'}</span>
+              <span className="bet-reason">{b.reason ? humanizeIds(b.reason, snapshot) : '理由の記載なし'}</span>
               <PayoutLine estimate={estimateBet(snapshot, b)} spent={totals.spent} />
             </li>
           ))}
@@ -346,3 +347,109 @@ export function BudgetPanel({ snapshot, response }: { snapshot: RaceSnapshot; re
 }
 
 export { SCENARIO_LABELS };
+
+/* ------------------------------------------------------------------ */
+/* Verdict: the conclusion at a glance, built only from structured data */
+
+export function Verdict({ snapshot, response }: { snapshot: RaceSnapshot; response: AnalysisResponse }) {
+  const horse = (id: string) => snapshot.horses.find((h) => h.id === id);
+  const base = response.scenarios.find((s) => s.id === 'base');
+  const order = base && base.status === 'analyzed' ? base.order : [];
+  const top = order[0] ? horse(order[0]) : undefined;
+  const rivals = order.slice(1, 5).map(horse).filter((h): h is NonNullable<typeof h> => Boolean(h));
+  const totals = computeTotals(snapshot.budget, response.bets);
+  const deps = sharedHorseDependencies(response.bets);
+  const allOnOne = response.bets.length > 1 && deps.find((d) => d.betIndexes.length === response.bets.length);
+
+  const scenarioLines = (['wet', 'fast'] as const).map((id) => {
+    const s = response.scenarios.find((x) => x.id === id);
+    if (!s || s.status !== 'analyzed' || !s.order.length) return { id, text: '未分析' };
+    const t = horse(s.order[0]!);
+    if (!top) return { id, text: `1位は${t ? `${t.number}番` : '不明'}` };
+    return { id, text: s.order[0] === order[0] ? `首位は変わらず（${top.number}番）` : `首位が${t ? `${t.number}番 ${t.name}` : '別の馬'}に変わる` };
+  });
+
+  const cautions: string[] = [];
+  const it = snapshot.items;
+  if (it?.odds?.status === 'stale') cautions.push(`オッズは古い情報（${formatJst(snapshot.odds?.asOf ?? null)}時点）`);
+  else if (!snapshot.odds || it?.odds?.status === 'missing') cautions.push('オッズ未取得：配分は候補');
+  if (it?.track?.status !== 'ok' || /参考・過去情報/.test(it?.track?.text ?? '')) cautions.push('当日の馬場は未取得（参考情報のみ）');
+  if (allOnOne) cautions.push(`全買い目が${horseLabel(snapshot, allOnOne.horseId)}に依存`);
+
+  return (
+    <div className="verdict">
+      {top ? (
+        <div className="verdict-pick">
+          <span className="verdict-label">中心候補</span>
+          <span className="verdict-no num">{String(top.number).padStart(2, '0')}</span>
+          <span className="verdict-name">{top.name}</span>
+          <span className="verdict-note">基本の想定で1位</span>
+        </div>
+      ) : (
+        <p className="verdict-hold">中心候補は保留（基本の想定が未分析）</p>
+      )}
+      {rivals.length > 0 && (
+        <div className="verdict-rivals">
+          <span className="verdict-label">相手</span>
+          <ul>
+            {rivals.map((h) => (
+              <li key={h.id}>
+                <b className="num">{String(h.number).padStart(2, '0')}</b> {h.name}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <ul className="verdict-points">
+        {scenarioLines.map((l) => (
+          <li key={l.id}>
+            <Icon name={l.id === 'wet' ? 'cloud-rain' : 'wind'} />
+            <span>
+              <span className="muted">{SCENARIO_LABELS[l.id]}：</span>
+              {l.text}
+            </span>
+          </li>
+        ))}
+        <li>
+          <Icon name="wallet" />
+          <span>
+            <span className="muted">買い目：</span>
+            {response.bets.length ? (
+              <>
+                {response.bets.length}点 <b className="num">{formatYen(totals.spent)}</b>（残す {formatYen(totals.unspent)}・最大損失 {formatYen(totals.maxLoss)}）
+              </>
+            ) : (
+              'なし'
+            )}
+          </span>
+        </li>
+      </ul>
+      {cautions.length > 0 && (
+        <ul className="verdict-cautions" aria-label="注意">
+          {cautions.map((c) => (
+            <li key={c}>
+              <Icon name="warning" size={16} />
+              {c}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Claude's summary, one line per 【事実】/【推測】 tag, horse ids shown as 馬番. */
+export function SummaryLines({ snapshot, summary }: { snapshot: RaceSnapshot; summary: string }) {
+  const lines = splitSummary(humanizeIds(summary, snapshot));
+  if (!lines.length) return <p className="muted">要約の記載はありません。</p>;
+  return (
+    <ul className="summary-lines">
+      {lines.map((l, i) => (
+        <li key={i}>
+          {l.tag && <span className={`ftag ${l.tag === '事実' ? 'fact' : 'guess'}`}>{l.tag}</span>}
+          <span>{l.text}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}

@@ -120,7 +120,9 @@ await page.getByRole('button', { name: 'この内容で保存してレポート�
 await page.waitForURL(/#\/report\//);
 await page.waitForSelector('#report-title');
 check('report: demo strip shown', (await page.locator('.demo-strip').innerText()).includes('架空デモ'));
-check('report: conclusion in cover', (await page.locator('.conclusion').innerText()).includes('良馬場ならA馬'));
+check('report: verdict shows the base-scenario top pick', (await page.locator('.verdict-pick').innerText()).includes('A馬'));
+await page.locator('.summary-box summary').click();
+check('report: Claude summary readable as lines', (await page.locator('.summary-lines').innerText()).includes('良馬場ならA馬'));
 check('report: candidates with roles', (await page.locator('.cand .role').first().innerText()) === '中心候補');
 await overflow('report');
 
@@ -261,6 +263,7 @@ const budgetText = await r.locator('.r-side').innerText();
 check('real report: win payout estimate ¥3,200', budgetText.includes('¥3,200'));
 check('real report: wide payout range ¥4,200〜¥5,600', budgetText.includes('¥4,200〜¥5,600'));
 check('real report: profit shown separately', budgetText.includes('この買い目だけ的中した場合の収支'));
+await r.locator('.summary-box summary').click();
 check('real report: HTML in summary is text', (await r.locator('.cover script').count()) === 0 && (await r.locator('.cover').innerText()).includes('<script>'));
 check('real report: no demo strip', (await r.locator('.demo-strip').count()) === 0);
 check('real report: confirmed course/R shown', (await r.locator('.cover-meta').innerText()).includes('東京') && (await r.locator('.cover-meta').innerText()).includes('11R'));

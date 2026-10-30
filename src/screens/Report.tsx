@@ -9,7 +9,8 @@ import { getAnalysis, listAnalyses, setNoteArticle } from '../storage/db';
 import { navigate, useApp } from '../state';
 import { CopyButton, EmptyState, Icon, OpenClaudeLink, OrbitVisual, SafeLink } from '../ui/common';
 import { SafeMarkdown } from '../ui/SafeMarkdown';
-import { BudgetPanel, Candidates, ScenarioCompare, STATUS_LABELS } from './reportParts';
+import { BudgetPanel, Candidates, ScenarioCompare, STATUS_LABELS, SummaryLines, Verdict } from './reportParts';
+import { humanizeIds, splitSummary } from '../domain/reportText';
 
 export function Report({ id }: { id: string }) {
   const [rec, setRec] = useState<SavedAnalysis | null | undefined>(undefined);
@@ -93,9 +94,15 @@ export function Report({ id }: { id: string }) {
             <span className={race.number ? 'num' : 'unconfirmed'}>{race.number ? `${race.number}R` : 'R番号未確認'}</span>
           </p>
           <div className="conclusion">
-            <span className="tag">結論</span>
-            <p className="conclusion-text">{response.summary || '結論の記載はありません。'}</p>
-            <span className={`badge ${response.status === 'ready' ? 'ok' : 'warn'}`}>{STATUS_LABELS[response.status]}</span>
+            <div className="row">
+              <span className="tag">結論</span>
+              <span className={`badge ${response.status === 'ready' ? 'ok' : 'warn'}`}>{STATUS_LABELS[response.status]}</span>
+            </div>
+            <Verdict snapshot={snapshot} response={response} />
+            <details className="summary-box">
+              <summary>Claudeの要約を読む（{splitSummary(response.summary).length}項目）</summary>
+              <SummaryLines snapshot={snapshot} summary={response.summary} />
+            </details>
           </div>
         </div>
         <OrbitVisual />
@@ -151,7 +158,7 @@ export function Report({ id }: { id: string }) {
           {response.reviewTriggers.length ? (
             <ul className="plain">
               {response.reviewTriggers.map((t, i) => (
-                <li key={i}>・{t}</li>
+                <li key={i}>・{humanizeIds(t, snapshot)}</li>
               ))}
             </ul>
           ) : (
@@ -179,7 +186,7 @@ export function Report({ id }: { id: string }) {
                   <li key={`m${i}`}>未取得：{m}</li>
                 ))}
                 {response.limitations.map((m, i) => (
-                  <li key={`l${i}`}>{m}</li>
+                  <li key={`l${i}`}>{humanizeIds(m, snapshot)}</li>
                 ))}
                 {snapshot.missing.length + response.limitations.length === 0 && <li className="muted">記載なし</li>}
               </ul>
