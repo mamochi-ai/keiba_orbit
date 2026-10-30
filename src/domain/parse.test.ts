@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePastedJson, stripOuterFence } from './parse';
+import { joinParts, parsePastedJson, stripOuterFence } from './parse';
 
 describe('parsePastedJson', () => {
   it('accepts plain JSON and a single json fence', () => {
@@ -74,5 +74,43 @@ describe('truncated replies', () => {
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.truncated ?? false, t).toBe(false);
     }
+  });
+});
+
+describe('joinParts (a reply delivered in several messages)', () => {
+  const reply = JSON.stringify({
+    schemaVersion: 1,
+    summary: '基本は1番。雨なら 3番 を再評価。',
+    horses: Array.from({ length: 16 }, (_, i) => ({ id: `h${String(i + 1).padStart(2, '0')}`, reasons: [`【事実】ダート1400mで${i}着、着差1.${i}`], concerns: ['【推測】速い流れは不安'] })),
+  });
+
+  it('rebuilds the exact JSON wherever it was cut, with or without fences and repeated text', () => {
+    for (const cut of [1, 37, 200, 511, reply.length - 3]) {
+      for (const repeat of [0, 8, 25]) {
+        const a = '```json\n' + reply.slice(0, cut) + '\n';
+        const b = '\n' + reply.slice(Math.max(0, cut - repeat)) + '\n```\n';
+        const { text } = joinParts([a, b]);
+        expect(text, `cut=${cut} repeat=${repeat}`).toBe(reply);
+        expect(parsePastedJson(text).ok).toBe(true);
+      }
+    }
+  });
+
+  it('joins three parts and reports what was removed', () => {
+    const c1 = 300;
+    const c2 = 900;
+    const r = joinParts([reply.slice(0, c1), reply.slice(c1 - 10, c2), '```\n' + reply.slice(c2) + '\n```']);
+    expect(r.text).toBe(reply);
+    expect(r.overlaps).toEqual([10, 0]);
+  });
+
+  it('keeps a space that falls exactly on the seam inside a string', () => {
+    const i = reply.indexOf(' 3番');
+    expect(joinParts([reply.slice(0, i), reply.slice(i)]).text).toBe(reply);
+  });
+
+  it('a still-unfinished joined reply is reported as cut off', () => {
+    const r = parsePastedJson(joinParts([reply.slice(0, 300), reply.slice(300, 600)]).text);
+    expect(r.ok === false && r.truncated).toBe(true);
   });
 });

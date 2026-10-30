@@ -441,3 +441,7 @@ input::-webkit-date-and-time-value { min-height: 24px; line-height: 24px; }
 .win-odds .hint { display: block; margin: 0; font-size: 12px; font-weight: 400; }
 .past-runs summary { min-height: 44px; display: flex; align-items: center; color: var(--cyan); cursor: pointer; font-size: 15px; }
 .past-runs li { font-size: 14px; padding: 4px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.paste-part { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line-strong); display: grid; gap: 6px; justify-items: start; }
+.paste-part label { width: 100%; }
+.continue-row { display: flex; gap: 10px 12px; align-items: flex-start; flex-wrap: wrap; margin-top: 12px; }
+.continue-row .copy-block > .btn { width: auto; min-height: 44px; padding: 8px 14px; font-size: 15px; }

@@ -1,18 +1,25 @@
 import { useState } from 'react';
 import { demoResponse } from '../domain/demo';
 import { activeRunners, computeTotals, estimateBet, formatYen } from '../domain/money';
-import { parsePastedJson } from '../domain/parse';
+import { CONTINUE_REQUEST, joinParts, parsePastedJson } from '../domain/parse';
 import { SCENARIO_LABELS, type SavedAnalysis } from '../domain/schema';
 import { checkResponse, horseLabel, type ResponseCheck } from '../domain/validate';
 import { nowIso } from '../domain/time';
 import { addAnalysis, nextVersion } from '../storage/db';
 import { navigate, useApp } from '../state';
-import { EmptyState, Icon } from '../ui/common';
+import { CopyButton, EmptyState, Icon } from '../ui/common';
 import { betLabel, PayoutLine, STATUS_LABELS } from './reportParts';
 
 export function Paste() {
   const { draft, setDraft } = useApp();
-  const [text, setText] = useState('');
+  // A long reply can arrive in several messages: part 1, then each 「続き」.
+  const [parts, setParts] = useState<string[]>(['']);
+  const joined = parts.length > 1 ? joinParts(parts) : null;
+  const text = joined ? joined.text : parts[0]!;
+  const setPart = (i: number, v: string) => {
+    setParts((ps) => ps.map((p, j) => (j === i ? v : p)));
+    setCheck(null);
+  };
   const [parseError, setParseError] = useState<{ message: string; line?: number; truncated?: boolean } | null>(null);
   const [check, setCheck] = useState<ResponseCheck | null>(null);
   const [saving, setSaving] = useState(false);
@@ -93,27 +100,48 @@ export function Paste() {
         </p>
       </div>
       <section className="sec first">
-        <label>
-          Claudeの応答（JSONのみ、または ```json のコードフェンス1個）
-          <textarea
-            rows={10}
-            value={text}
-            onChange={(e) => {
-              setText(e.target.value);
-              setCheck(null);
-            }}
-            spellCheck={false}
-            className="mono"
-            aria-invalid={Boolean(parseError)}
-            aria-describedby="paste-error"
-          />
-        </label>
+        {parts.map((p, i) => (
+          <div key={i} className={i ? 'paste-part' : undefined}>
+            <label>
+              {i === 0 ? 'Claudeの応答（JSONのみ、または ```json のコードフェンス1個）' : `続き（${i + 1}つ目）`}
+              <textarea
+                rows={i === 0 ? 10 : 6}
+                value={p}
+                onChange={(e) => setPart(i, e.target.value)}
+                spellCheck={false}
+                className="mono"
+                aria-invalid={Boolean(parseError)}
+                aria-describedby="paste-error"
+              />
+            </label>
+            {i > 0 && (
+              <button type="button" className="btn ghost small" onClick={() => setParts((ps) => ps.filter((_, j) => j !== i))}>
+                この続きを削除
+              </button>
+            )}
+          </div>
+        ))}
+        <div className="continue-row">
+          <button type="button" className="btn small" onClick={() => setParts((ps) => [...ps, ''])} disabled={!parts[parts.length - 1]!.trim()}>
+            ＋ 続きを貼り足す
+          </button>
+          <CopyButton label="続きを頼む文をコピー" primary={false} getText={() => CONTINUE_REQUEST} />
+        </div>
+        <p className="hint">
+          応答が長くて途中で止まったら、「続きを頼む文をコピー」→ Claudeに送信 → 出てきた続きを「＋ 続きを貼り足す」の欄に貼ります。何回に分かれても、つなげて読み込みます。
+        </p>
+        {joined && (
+          <p className="hint">
+            {parts.length}つをつなげて {joined.text.length.toLocaleString('ja-JP')} 文字
+            {joined.overlaps.some((k) => k > 0) && `（つなぎ目で重複した ${joined.overlaps.reduce((a, b) => a + b, 0)} 文字を除きました）`}
+          </p>
+        )}
         <div className="row mt">
           <button type="button" className="btn primary" onClick={read} disabled={!text.trim()}>
             <Icon name="search" /> 読み込んで確認
           </button>
           {snapshot.isDemo && (
-            <button type="button" className="btn" onClick={() => setText(JSON.stringify(demoResponse(snapshot), null, 2))}>
+            <button type="button" className="btn" onClick={() => setParts([JSON.stringify(demoResponse(snapshot), null, 2)])}>
               架空デモの応答を入れる
             </button>
           )}
@@ -128,15 +156,12 @@ export function Paste() {
             {parseError.truncated ? (
               <div className="truncated-help">
                 <p>
-                  <b>Claudeの応答が途中で切れています。</b>次のどちらかで直せます。
+                  <b>Claudeの応答が途中で切れています。</b>続きを出してもらい、貼り足してください。
                 </p>
                 <ol className="guide-steps">
-                  <li>
-                    Claudeに「続きを、前の出力の最後の文字の直後からそのまま出力してください」と送り、出てきた続きをこの欄の最後に貼り足して、もう一度「読み込んで確認」。
-                  </li>
-                  <li>
-                    Claudeに「JSONが長すぎて途中で切れました。horses は注目する馬5頭まで、reasons と concerns は各2件まで、各文は短くして、JSONだけを最初から出力し直してください」と送り、新しい応答を貼り直す。
-                  </li>
+                  <li>上の「続きを頼む文をコピー」を押し、Claudeの同じチャットに貼って送信。</li>
+                  <li>出てきた続きをコピーし、「＋ 続きを貼り足す」で増えた欄に貼る。</li>
+                  <li>もう一度「読み込んで確認」。続きがまた切れていたら、同じ手順をくり返します。</li>
                 </ol>
                 <p className="hint">Claudeがまだ書いている途中でコピーした場合も、こうなります。応答が終わってからコピーしてください。</p>
               </div>
