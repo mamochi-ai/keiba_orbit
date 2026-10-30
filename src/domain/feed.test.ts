@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import sample from '../test/feed-sample.json';
 import received from '../test/feed-received-2026-10-28.json';
 import extended from '../test/feed-extended-example.json';
-import { normalizeStoredRace } from './feed';
+import { normalizeStoredRace, unnumberedRunners } from './feed';
 import { formatRange, matchTrack, mergeRace, parseFeed, type FeedRace } from './feed';
 import { feedRaceToDraft } from './feedDraft';
 import { applyFeed, listFeedRaces, listFeedTracks } from '../storage/db';
@@ -254,5 +254,46 @@ describe('received JRA data (schema 1.0)', () => {
     expect(n.runners[0]).toMatchObject({ scratched: null, winOdds: null, popularity: null, pastRuns: [] });
     expect(n.winOddsUpdatedAt).toBeNull();
     expect(() => feedRaceToDraft(n, [])).not.toThrow();
+  });
+
+  it('accepts runners whose 馬番 is not yet published, and blocks analysis until it is', () => {
+    const v = structuredClone(extended) as unknown as { races: { runners: Record<string, unknown>[]; wide_odds: unknown }[] };
+    for (const r of v.races[0]!.runners) {
+      r.horse_number = null;
+      r.bracket = null;
+    }
+    v.races[0]!.wide_odds = null;
+    const f = parsed(v);
+    const race = f.races[0]!;
+    expect(race.runners).toHaveLength(4);
+    expect(unnumberedRunners(race)).toHaveLength(4);
+    expect(f.issues.map((i) => i.message).join()).toContain('4頭の馬番が未発表');
+    const { draft, notes } = feedRaceToDraft(race, f.tracks);
+    expect(draft.horses).toHaveLength(0);
+    expect(notes[0]).toContain('馬番が未発表');
+
+    // Re-import after 馬番 are published: matched by name, numbers filled, nothing duplicated.
+    const numbered = parsed(extended).races[0]!;
+    const merged = mergeRace(race, numbered).race;
+    expect(merged.runners.map((r) => r.horseNumber)).toEqual([1, 2, 3, 4]);
+    expect(unnumberedRunners(merged)).toHaveLength(0);
+    // A later partial file without numbers keeps the published ones.
+    const again = mergeRace(merged, race).race;
+    expect(again.runners.map((r) => r.horseNumber)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('turns out-of-range past-run values into 未取得 with a warning instead of rejecting the file', () => {
+    const v = structuredClone(extended) as unknown as { collection_notes: string[]; races: { runners: { past_runs?: Record<string, unknown>[] }[] }[] };
+    v.races[0]!.runners[0]!.past_runs![0]!.distance_m = 3;
+    v.races[0]!.runners[0]!.past_runs![0]!.body_weight_kg = 4780;
+    v.collection_notes = Array.from({ length: 91 }, (_, i) => `メモ${i}`);
+    const f = parsed(v);
+    const p = f.races[0]!.runners[0]!.pastRuns[0]!;
+    expect(p.distance_m).toBeNull();
+    expect(p.body_weight_kg).toBeNull();
+    expect(p.last_3f).toBe(33.8);
+    const msgs = f.issues.map((i) => i.message).join();
+    expect(msgs).toContain('距離に範囲外の値が1件');
+    expect(msgs).toContain('馬体重に範囲外の値が1件');
   });
 });
