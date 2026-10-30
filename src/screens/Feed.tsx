@@ -246,8 +246,8 @@ function RaceList({ races }: { races: FeedRace[] }) {
             <div>
               <p className="saved-title">
                 <a href={feedHref(r.key)}>
-                  {r.venue}
-                  <span className="num">{r.number}R</span> {r.name}
+                  {/* One text node: the link is inline-flex, which would drop the space between items. */}
+                  <span>{`${r.venue}${r.number}R ${r.name}`}</span>
                 </a>
               </p>
               <p className="muted">
