@@ -95,11 +95,21 @@ export function Prepare() {
             </h2>
             <span className="sec-note">開くと出典・取得時刻・入力欄を表示</span>
           </div>
+          {draft.horses.length === 0 && !draft.isDemo && (
+            <div className="feed-hint" role="note">
+              <p>
+                <b>出走表がまだありません。</b>受け取ったデータからレースを選ぶと、出走表・オッズ・過去成績・馬場がまとめて入ります。
+              </p>
+              <a className="btn primary small" href="#/feed">
+                受け取ったデータからレースを選ぶ <Icon name="arrow" />
+              </a>
+            </div>
+          )}
           <div className="data-list">
-            <CardImport onApplied={() => setRev((r) => r + 1)} />
             {ITEM_KEYS.filter((k) => k !== 'identity').map((k) => (
               <ItemEditor key={`${k}-${rev}`} itemKey={k} />
             ))}
+            <CardImport onApplied={() => setRev((r) => r + 1)} />
           </div>
         </section>
 
@@ -209,7 +219,6 @@ function ItemEditor({ itemKey }: { itemKey: ItemKey }) {
   const [errors, setErrors] = useState<string[]>([]);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [initiallyOpen] = useState(itemKey === 'entries' && status === 'missing');
 
   function apply() {
     setSaved(false);
@@ -311,8 +320,9 @@ function ItemEditor({ itemKey }: { itemKey: ItemKey }) {
         ? '開催日と競馬場を確認すると取得できます'
         : null;
 
+  // Rows start closed; received data (受け取ったデータ) is the main way to fill them.
   return (
-    <details className="item" open={initiallyOpen}>
+    <details className="item">
       <summary className="item-head">
         <span className="item-label">{ITEM_LABELS[itemKey]}</span>
         <StatusBadge status={status} />

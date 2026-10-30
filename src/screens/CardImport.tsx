@@ -20,14 +20,12 @@ export function CardImport({ onApplied }: { onApplied: () => void }) {
   const [usePast, setUsePast] = useState(true);
   const [oddsLocal, setOddsLocal] = useState('');
   const [done, setDone] = useState<string | null>(null);
-  // Opened by default only when the panel first appears without entries; never auto-collapses.
-  const [initiallyOpen] = useState(draft.horses.length === 0);
 
   if (draft.isDemo) {
     return (
       <section className="item card-import" aria-labelledby="card-title" style={{ padding: "14px 12px" }}>
         <h2 id="card-title" className="item-label">
-          出馬表を貼り付けて自動入力
+          予備：出馬表ページを貼り付けて入力
         </h2>
         <p className="hint">架空デモでは使えません。実在のレースで「新しく始める」から使ってください。</p>
       </section>
@@ -107,13 +105,14 @@ export function CardImport({ onApplied }: { onApplied: () => void }) {
   }
 
   return (
-    <details className="item card-import" open={initiallyOpen}>
+    // Backup path: received data (受け取ったデータ) is the main source, so this stays closed.
+    <details className="item card-import">
       <summary className="item-head">
         <span className="item-label">
-          <Icon name="paste" /> 出馬表を貼り付けて自動入力
+          <Icon name="paste" /> 予備：出馬表ページを貼り付けて入力
         </span>
-        <span className="badge ok">おすすめ</span>
-        <span className="item-meta">出走表・単勝オッズ・過去成績をまとめて入力</span>
+        <span />
+        <span className="item-meta">受け取ったデータにないときに。JRAの出馬表ページから出走表・単勝オッズ・過去成績を入力</span>
       </summary>
       <div className="item-body">
         <ol className="steps">
