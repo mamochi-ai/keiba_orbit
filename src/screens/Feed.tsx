@@ -486,6 +486,8 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
             {w.pairs.length === 0 ? (
               <p className="muted mt">オッズの組み合わせは未取得です（出走馬がいないという意味ではありません）。</p>
             ) : (
+              <details className="subgroup mt" open={w.pairs.length <= 28}>
+              <summary>ワイド {w.pairs.length}組を表示</summary>
               <ul className="pair-grid" aria-label="ワイドオッズ（範囲）">
                 {w.pairs.map((p) => (
                   <li key={`${p.a}-${p.b}`}>
@@ -499,6 +501,7 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
                   </li>
                 ))}
               </ul>
+              </details>
             )}
             <p className="hint">ワイドは範囲（下限〜上限）の目安で、最終オッズや払戻金ではありません。</p>
             {race.previousWide && race.previousWide.pairs.length > 0 && (
