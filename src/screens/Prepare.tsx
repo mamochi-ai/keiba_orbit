@@ -5,8 +5,8 @@ import { ITEM_KEYS, ITEM_LABELS, ITEM_TEXT_LIMITS, isSafeHttpUrl, type ItemKey, 
 import { parseSnapshot } from '../domain/validate';
 import { formatDateJa, formatJst, isoToJstLocal, jstLocalToIso, nowIso } from '../domain/time';
 import { fetchWeather, WEATHER_PROVIDER } from '../data/weather';
-import { navigate, useApp } from '../state';
-import { CLAUDE_URL, CopyButton, EmptyState, Icon, SafeLink, StatusBadge } from '../ui/common';
+import { DEFAULT_CLAUDE_URL, navigate, useApp } from '../state';
+import { CopyButton, EmptyState, Icon, OpenClaudeLink, SafeLink, StatusBadge } from '../ui/common';
 import { CardImport } from './CardImport';
 import { CopyGuide } from '../ui/CopyGuide';
 
@@ -20,7 +20,7 @@ const HINTS: Record<ItemKey, string> = {
 };
 
 export function Prepare() {
-  const { draft, setDraft, images } = useApp();
+  const { draft, setDraft, images, settings } = useApp();
   const homeErrors = validateHome(draft);
   const snapshotRef = useRef<RaceSnapshot | null>(null);
   // Bumped after the 出馬表 import so the item editors re-read the draft.
@@ -158,10 +158,8 @@ export function Prepare() {
                 <span className="step-no">2</span>
                 <span className="step-title">Claudeで分析</span>
                 <div className="step-body">
-                  <a className={`btn ${step === 2 ? 'primary' : ''}`} href={CLAUDE_URL} target="_blank" rel="noopener noreferrer" onClick={() => setOpened(true)}>
-                    Claudeを開く <Icon name="external" />
-                  </a>
-                  <p className="hint">新しいチャットに貼り付けて送信します。{images.length > 0 && `参考画像${images.length}枚はここで添付してください。`}</p>
+                  <OpenClaudeLink primary={step === 2} onOpen={() => setOpened(true)} />
+                  <p className="hint">{settings.claudeUrl === DEFAULT_CLAUDE_URL ? '新しいチャットに' : '設定したチャットに'}貼り付けて送信します。{images.length > 0 && `参考画像${images.length}枚はここで添付してください。`}</p>
                 </div>
               </li>
               <li className={stepClass(3)} aria-current={step === 3 ? 'step' : undefined}>

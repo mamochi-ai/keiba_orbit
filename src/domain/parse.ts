@@ -4,7 +4,7 @@ import { MAX_PASTE_BYTES } from './schema';
 
 export type ParseResult =
   | { ok: true; value: unknown }
-  | { ok: false; message: string; line?: number; column?: number };
+  | { ok: false; message: string; line?: number; column?: number; truncated?: boolean };
 
 export function lineCol(text: string, index: number): { line: number; column: number } {
   const before = text.slice(0, index);
@@ -159,7 +159,13 @@ export function parsePastedJson(raw: string): ParseResult {
     return fail(text, offset + lead, 'JSONは { で始まる必要があります。前置きの文章を削除してください');
   }
   const syntax = findJsonError(body);
-  if (syntax) return fail(text, offset + syntax.index, syntax.message);
+  if (syntax) {
+    // An error at the very end means the JSON simply stops: Claude's reply was cut off.
+    if (syntax.index >= body.trimEnd().length) {
+      return { ...(fail(text, offset + syntax.index, 'JSONが途中で終わっています（応答が最後まで出力されていません）') as Extract<ParseResult, { ok: false }>), truncated: true };
+    }
+    return fail(text, offset + syntax.index, syntax.message);
+  }
   try {
     return { ok: true, value: JSON.parse(body) as unknown };
   } catch (e) {

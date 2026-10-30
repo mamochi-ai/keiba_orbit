@@ -330,6 +330,29 @@ for (const w of [390, 1024]) {
 }
 await feedCtx.close();
 
+// Claude link setting and cut-off replies
+const cl = await browser.newContext({ viewport: { width: 1024, height: 900 } });
+const cp = await cl.newPage();
+await cp.goto(base + '#/settings');
+await cp.getByLabel(/開き先のURL/).fill('https://example.com/chat');
+await cp.getByRole('button', { name: '保存', exact: true }).click();
+check('settings: non-claude.ai URL rejected', (await cp.locator('#claude-target ~ * .error-text, section:has(#claude-target) .error-text').innerText()).includes('https://claude.ai/'));
+await cp.getByLabel(/開き先のURL/).fill('https://claude.ai/project/keiba-ai-test');
+await cp.getByRole('button', { name: '保存', exact: true }).click();
+await cp.goto(base);
+await cp.waitForSelector('button.btn');
+await cp.getByRole('button', { name: '架空デモで試す' }).click();
+await cp.waitForURL(/prepare/);
+check('prep: Claude link opens the saved chat', (await cp.getByRole('link', { name: /Claudeを開く/ }).getAttribute('href')) === 'https://claude.ai/project/keiba-ai-test');
+await cp.getByLabel('分析対象と情報締切を確認しました').check();
+await cp.getByRole('button', { name: '分析用コピー' }).click().catch(() => {});
+await cp.waitForTimeout(300);
+await cp.getByRole('button', { name: '結果を貼り付け' }).click();
+await cp.getByLabel(/Claudeの応答/).fill('{"schemaVersion":1,"horses":[{"id":"h01","sourceIds":["src-past"\n');
+await cp.getByRole('button', { name: '読み込んで確認' }).click();
+check('paste: cut-off reply explained', (await cp.locator('#paste-error').innerText()).includes('途中で切れています'));
+await cl.close();
+
 // Empty states in a fresh browser profile
 const fresh = await browser.newContext({ viewport: { width: 390, height: 844 } });
 const f = await fresh.newPage();
