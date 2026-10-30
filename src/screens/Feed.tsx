@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
-import { FEED_STATE_LABEL, formatRange, matchTrack, parseFeed, trackSummary, type FeedRace, type FeedTrack, type FeedWide } from '../domain/feed';
+import { FEED_STATE_LABEL, formatRange, matchTrack, parseFeed, trackSummary, unnumberedRunners, type FeedRace, type FeedTrack, type FeedWide } from '../domain/feed';
 import { feedRaceToDraft, pastRunLine } from '../domain/feedDraft';
 import { findJsonError } from '../domain/parse';
 import { formatDateJa, formatJst, nowIso } from '../domain/time';
@@ -203,13 +203,28 @@ function ImportSummary({ result, sample }: { result: FeedApplyResult; sample: bo
       )}
       {warnings.length > 0 && (
         <div className="notice">
+          <p>
+            <b>注意（{warnings.length}件）</b>
+          </p>
           <ul>
-            {warnings.map((e, i) => (
+            {warnings.slice(0, 5).map((e, i) => (
               <li key={i}>
                 {e.where}：{e.message}
               </li>
             ))}
           </ul>
+          {warnings.length > 5 && (
+            <details>
+              <summary className="linkish">残り{warnings.length - 5}件を表示</summary>
+              <ul>
+                {warnings.slice(5).map((e, i) => (
+                  <li key={i}>
+                    {e.where}：{e.message}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </div>
       )}
     </div>
@@ -244,6 +259,7 @@ function RaceList({ races }: { races: FeedRace[] }) {
             <div className="row">
               <span className={`badge ${r.runners.length ? 'ok' : ''}`}>
                 出走表 {r.runners.length ? `${r.runners.length}頭` : FEED_STATE_LABEL[r.entriesState]}
+                {unnumberedRunners(r).length ? '・馬番未発表' : ''}
                 {r.runnersRetained ? '（前回の値）' : ''}
               </span>
               {oddsBadge(r.wide)}
@@ -328,6 +344,7 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
   }
 
   const match = matchTrack(tracks, race);
+  const unnumbered = unnumberedRunners(race).length;
   const { notes } = feedRaceToDraft(race, tracks);
   const w = race.wide;
 
@@ -367,11 +384,15 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
       </div>
 
       <div className="cta" style={{ marginBottom: 8 }}>
-        <button type="button" className="btn primary cta-main" onClick={start} disabled={race.runners.length === 0} aria-describedby="start-note">
+        <button type="button" className="btn primary cta-main" onClick={start} disabled={race.runners.length === 0 || unnumbered > 0} aria-describedby="start-note">
           {race.sample ? 'テストデータで試す（架空デモ扱い）' : 'このレースで分析を準備'} <Icon name="arrow" />
         </button>
-        <p id="start-note" className={race.runners.length === 0 ? 'cta-reason' : 'hint'}>
-          {race.runners.length === 0 ? '出走表が未取得のため、分析を準備できません。' : notes.join(' ') || '出走表・オッズ・馬場情報を分析準備に入れます。'}
+        <p id="start-note" className={race.runners.length === 0 || unnumbered > 0 ? 'cta-reason' : 'hint'}>
+          {race.runners.length === 0
+            ? '出走表が未取得のため、分析を準備できません。'
+            : unnumbered > 0
+              ? `${unnumbered}頭の馬番が未発表のため、分析を準備できません。馬番が確定したデータを取り込んでください。`
+              : notes.join(' ') || '出走表・オッズ・馬場情報を分析準備に入れます。'}
         </p>
       </div>
 
@@ -390,8 +411,8 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
         ) : (
           <ol className="plain feed-runners">
             {race.runners.map((r) => (
-              <li key={r.horseNumber} className={`feed-runner ${r.scratched ? 'is-scratched' : ''}`}>
-                <span className="rank-no">{String(r.horseNumber).padStart(2, '0')}</span>
+              <li key={`${r.horseNumber ?? 'x'}-${r.name}`} className={`feed-runner ${r.scratched ? 'is-scratched' : ''}`}>
+                <span className="rank-no">{r.horseNumber !== null ? String(r.horseNumber).padStart(2, '0') : <span className="hint">未発表</span>}</span>
                 <span>
                   <b>{r.name}</b> {r.scratched && <span className="badge error">出走取消</span>}
                   <span className="hint" style={{ display: 'block', margin: 0 }}>
@@ -465,6 +486,8 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
             {w.pairs.length === 0 ? (
               <p className="muted mt">オッズの組み合わせは未取得です（出走馬がいないという意味ではありません）。</p>
             ) : (
+              <details className="subgroup mt" open={w.pairs.length <= 28}>
+              <summary>ワイド {w.pairs.length}組を表示</summary>
               <ul className="pair-grid" aria-label="ワイドオッズ（範囲）">
                 {w.pairs.map((p) => (
                   <li key={`${p.a}-${p.b}`}>
@@ -478,6 +501,7 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
                   </li>
                 ))}
               </ul>
+              </details>
             )}
             <p className="hint">ワイドは範囲（下限〜上限）の目安で、最終オッズや払戻金ではありません。</p>
             {race.previousWide && race.previousWide.pairs.length > 0 && (

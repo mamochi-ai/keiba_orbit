@@ -3,7 +3,9 @@
 //
 // Rules from the data provider:
 //  - race_key is NOT a JRA id. Races are matched by date + venue + race number.
-//  - Runners are matched by horse_number. bracket (枠番) is never a key.
+//  - Runners are matched by horse_number. bracket (枠番) is never a key. Before 馬番 are
+//    published horse_number is null: such runners are kept (matched by name on re-import)
+//    but an analysis cannot start until the numbers arrive.
 //  - weight_kg is 負担重量 (斤量), not 馬体重.
 //  - null numbers are unknown: never filled with 0 or guesses.
 //  - pairs: [] may mean "odds not collected"; it never means "no runners".
@@ -48,7 +50,7 @@ export type PastRun = z.infer<typeof pastRunSchema>;
 
 const runnerSchema = z.object({
   bracket: z.int().min(1).max(8).nullable(),
-  horse_number: z.int().min(1).max(18),
+  horse_number: z.int().min(1).max(18).nullable(),
   horse_name: str(40).min(1),
   sex: str(4).nullable(),
   age: z.int().min(1).max(20).nullable(),
@@ -122,7 +124,7 @@ export const feedSchema = z.object({
   sample: z.boolean(),
   description: str(1000).optional(),
   checked_on_jst: isoDate.nullable(),
-  collection_notes: z.array(str(500)).max(30).optional(),
+  collection_notes: z.array(str(2000)).max(500).optional(),
   races: z.array(raceSchema).max(300),
   track_conditions: z.array(trackSchema).max(100),
 });
@@ -177,7 +179,8 @@ export function classifyStatus(status: string | null | undefined): FeedState {
 }
 
 export interface FeedRunner {
-  horseNumber: number;
+  /** null = 馬番未発表. */
+  horseNumber: number | null;
   bracket: number | null;
   name: string;
   sex: string | null;
@@ -313,8 +316,53 @@ export interface ParsedFeed {
   issues: FeedIssue[];
 }
 
+/** Valid ranges for past-run numbers. A value outside is a collection error: it becomes null (未取得) with a warning instead of rejecting the file. */
+const PAST_RANGES: Record<string, [number, number]> = {
+  distance_m: [800, 5000],
+  field_size: [1, 30],
+  horse_number: [1, 30],
+  popularity: [1, 30],
+  last_3f: [20, 60],
+  weight_kg: [40, 70],
+  body_weight_kg: [300, 700],
+};
+const PAST_LABEL: Record<string, string> = { distance_m: '距離', field_size: '頭数', horse_number: '馬番', popularity: '人気', last_3f: '上がり3F', weight_kg: '斤量', body_weight_kg: '馬体重' };
+
+function sanitizePastRuns(value: unknown): { value: unknown; issues: FeedIssue[] } {
+  const v = value as { races?: { date?: unknown; venue?: unknown; race_number?: unknown; runners?: { past_runs?: Record<string, unknown>[] }[] }[] };
+  if (!v || !Array.isArray(v.races)) return { value, issues: [] };
+  const copy = structuredClone(v);
+  const issues: FeedIssue[] = [];
+  for (const race of copy.races ?? []) {
+    const found: Record<string, unknown[]> = {};
+    for (const ru of Array.isArray(race?.runners) ? race.runners : []) {
+      for (const p of Array.isArray(ru?.past_runs) ? ru.past_runs : []) {
+        if (!p || typeof p !== 'object') continue;
+        for (const [k, [lo, hi]] of Object.entries(PAST_RANGES)) {
+          const x = p[k];
+          if (x === null || x === undefined) continue;
+          if (typeof x !== 'number' || !Number.isFinite(x) || x < lo || x > hi || ((k !== 'last_3f' && k !== 'weight_kg') && !Number.isInteger(x))) {
+            (found[k] ??= []).push(x);
+            p[k] = null;
+          }
+        }
+      }
+    }
+    for (const [k, vals] of Object.entries(found)) {
+      const sample = [...new Set(vals.map(String))].slice(0, 3).join('・');
+      issues.push({
+        level: 'warning',
+        where: `${String(race?.date ?? '?')} ${String(race?.venue ?? '?')}${String(race?.race_number ?? '?')}R`,
+        message: `過去成績の${PAST_LABEL[k]}に範囲外の値が${vals.length}件あります（例：${sample}）。未取得として扱います。`,
+      });
+    }
+  }
+  return { value: copy, issues };
+}
+
 export function parseFeed(value: unknown, importedAt: string): { ok: true; feed: ParsedFeed } | { ok: false; errors: string[] } {
-  const r = feedSchema.safeParse(value);
+  const sanitized = sanitizePastRuns(value);
+  const r = feedSchema.safeParse(sanitized.value);
   if (!r.success) {
     return {
       ok: false,
@@ -325,7 +373,7 @@ export function parseFeed(value: unknown, importedAt: string): { ok: true; feed:
     };
   }
   const f = r.data;
-  const issues: FeedIssue[] = [];
+  const issues: FeedIssue[] = [...sanitized.issues];
   const unknown = unknownFields(value);
   if (unknown.length) {
     issues.push({
@@ -345,12 +393,14 @@ export function parseFeed(value: unknown, importedAt: string): { ok: true; feed:
       continue;
     }
     const numbers = new Set<number>();
-    const dup = raw.runners.find((ru) => (numbers.has(ru.horse_number) ? true : (numbers.add(ru.horse_number), false)));
+    const dup = raw.runners.find((ru) => ru.horse_number !== null && (numbers.has(ru.horse_number) ? true : (numbers.add(ru.horse_number), false)));
     if (dup) {
       issues.push({ level: 'error', where, message: `馬番 ${dup.horse_number} が出走馬に2回あります。このレースは取り込みません。` });
       continue;
     }
     seen.add(key);
+    const unnumbered = raw.runners.filter((ru) => ru.horse_number === null).length;
+    if (unnumbered) issues.push({ level: 'warning', where, message: `${unnumbered}頭の馬番が未発表です。馬番が確定したデータを取り込むまで、このレースの分析は準備できません。` });
     const scratchedWithOdds = raw.runners.filter((ru) => ru.scratched && ru.win_odds != null).map((ru) => ru.horse_number);
     if (scratchedWithOdds.length) issues.push({ level: 'warning', where, message: `出走取消の馬番 ${scratchedWithOdds.join('・')} に単勝オッズがあります。取消馬のオッズは使いません。` });
     if (raw.runners.some((ru) => ru.win_odds != null) && !raw.win_odds_updated_at_jst) issues.push({ level: 'warning', where, message: '単勝オッズの情報時点（win_odds_updated_at_jst）がありません。時点不明として扱います。' });
@@ -425,7 +475,8 @@ export function parseFeed(value: unknown, importedAt: string): { ok: true; feed:
           popularity: ru.popularity ?? null,
           pastRuns: (ru.past_runs ?? []).slice(0, 4),
         }))
-        .sort((a, b) => a.horseNumber - b.horseNumber),
+        // Numbered runners by 馬番; unnumbered ones keep the received order after them.
+        .sort((a, b) => (a.horseNumber ?? Infinity) - (b.horseNumber ?? Infinity)),
       runnersCheckedOn: raw.runners.length ? f.checked_on_jst : null,
       winOddsUpdatedAt: raw.win_odds_updated_at_jst ?? null,
       winOddsSourceUrl: raw.win_odds_source_url ?? null,
@@ -476,6 +527,19 @@ function pickKeep<T>(incoming: T | null, existing: T | null | undefined, field: 
   return null;
 }
 
+/** Same horse in another import: by 馬番 when both have one, otherwise by name. */
+function sameRunner(list: FeedRunner[], r: FeedRunner): FeedRunner | undefined {
+  if (r.horseNumber !== null) {
+    const byNo = list.find((o) => o.horseNumber === r.horseNumber);
+    if (byNo) return byNo;
+  }
+  return list.find((o) => (o.horseNumber === null || r.horseNumber === null) && o.name === r.name);
+}
+
+export function unnumberedRunners(race: Pick<FeedRace, 'runners'>): FeedRunner[] {
+  return race.runners.filter((r) => r.horseNumber === null);
+}
+
 function samePairs(a: WidePair[], b: WidePair[]): boolean {
   return a.length === b.length && a.every((p, i) => p.a === b[i]!.a && p.b === b[i]!.b && p.min === b[i]!.min && p.max === b[i]!.max);
 }
@@ -511,11 +575,12 @@ export function mergeRace(existing: FeedRace | undefined, incoming: FeedRace): {
     } else {
       race.runnersRetained = false;
       race.runners = incoming.runners.map((ru) => {
-        const old = existing.runners.find((o) => o.horseNumber === ru.horseNumber);
+        const old = sameRunner(existing.runners, ru);
         if (!old) return ru;
         const r: string[] = [];
         return {
           ...ru,
+          horseNumber: pickKeep(ru.horseNumber, old.horseNumber, '馬番', r),
           bracket: pickKeep(ru.bracket, old.bracket, '枠番', r),
           sex: pickKeep(ru.sex, old.sex, '性', r),
           age: pickKeep(ru.age, old.age, '年齢', r),
@@ -528,9 +593,9 @@ export function mergeRace(existing: FeedRace | undefined, incoming: FeedRace): {
           ...(r.length ? { retained: r } : {}),
         };
       });
-      const dropped = existing.runners.filter((o) => !incoming.runners.some((ru) => ru.horseNumber === o.horseNumber));
+      const dropped = existing.runners.filter((o) => !sameRunner(incoming.runners, o));
       if (incoming.runners.length && dropped.length) {
-        issues.push({ level: 'warning', where, message: `前回あった馬番 ${dropped.map((d) => d.horseNumber).join('・')} が今回の出走表にありません（取消の可能性）。今回の出走表を使います。` });
+        issues.push({ level: 'warning', where, message: `前回あった ${dropped.map((d) => (d.horseNumber !== null ? `${d.horseNumber}番` : d.name)).join('・')} が今回の出走表にありません（取消の可能性）。今回の出走表を使います。` });
       }
     }
 
@@ -562,7 +627,7 @@ export function mergeRace(existing: FeedRace | undefined, incoming: FeedRace): {
 
   // Pairs must refer to runners of this race.
   if (race.wide && race.runners.length > 0) {
-    const nums = new Set(race.runners.map((r) => r.horseNumber));
+    const nums = new Set(race.runners.map((r) => r.horseNumber).filter((n): n is number => n !== null));
     const bad = race.wide.pairs.filter((p) => !nums.has(p.a) || !nums.has(p.b));
     if (bad.length) {
       for (const p of bad) issues.push({ level: 'error', where, message: `ワイド ${p.a}-${p.b}：出走馬にない馬番を含むため除外しました。` });

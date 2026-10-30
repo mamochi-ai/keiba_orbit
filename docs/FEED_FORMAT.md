@@ -35,7 +35,7 @@ KEIBA ORBIT の「受け取ったデータ」画面で取り込むJSONの形式�
 
 | 項目 | 型 | 内容 |
 | --- | --- | --- |
-| `horse_number` | 1〜18 | **照合キー**（枠番は照合に使わない） |
+| `horse_number` | 1〜18 / null | **照合キー**（枠番は照合に使わない）。馬番未発表なら null（取り込めるが、確定データを取り込むまで分析は準備できない。再取込時は馬名で照合） |
 | `bracket` | 1〜8 / null | 枠番 |
 | `horse_name` | 文字列 | 馬名 |
 | `sex` / `age` | 文字列 / 整数（null可） | 性・年齢 |
@@ -67,6 +67,9 @@ KEIBA ORBIT の「受け取ったデータ」画面で取り込むJSONの形式�
 `venue`、`status`、`source_url`、`page_race_date`（対象の開催日）、`going_as_of_jst`（馬場状態の時点）、`weather`、`turf_going`、`dirt_going`、`cushion_value`、`cushion_measured_at_jst`、`moisture_pct`（`turf`／`dirt` それぞれ `finish`・`turn4`）、`moisture_measured_at_jst`、`course`、`turf_notes`、`warning`
 
 ## 扱いのルール
+
+- 過去成績の数値が範囲外（例：距離 3）の場合、その値だけ未取得として扱い、取り込み結果に注意を出す（ファイル全体は拒否しない）。範囲：距離800〜5000m、頭数・馬番・人気1〜30、上がり3F 20〜60秒、斤量40〜70kg、馬体重300〜700kg。障害戦の距離もメートルで書く（例 3000）。
+- collection_notes は500件まで。
 
 - null は不明・未取得。0や推測値で埋めない。`pairs: []` は「オッズ未取得」で、出走馬がいない意味ではない。
 - 時刻は日本時間（`+09:00`）。馬場状態の時点、含水率・クッション値の測定時刻、オッズの時点は別々に記録し、互いに補わない。
