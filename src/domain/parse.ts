@@ -188,3 +188,38 @@ export function stripOuterFence(raw: string): { text: string; stripped: boolean 
   if (!m) return { text: raw, stripped: false };
   return { text: m[2]!, stripped: true };
 }
+
+/** What to send Claude when its reply stopped part-way. */
+export const CONTINUE_REQUEST =
+  '出力が途中で切れました。前の出力の最後の文字の直後から、JSONの続きだけを出力してください。前の出力の繰り返し、説明文、コードフェンス（```）は付けないでください。続きもまた途中で切れた場合は、同じように続きから出してください。';
+
+const FENCE_LINE = /^[ \t]*`{3,}[ \t]*(?:json|JSON)?[ \t]*$/gm;
+
+/**
+ * Join a reply that Claude delivered in several messages. Fence lines are dropped, line
+ * breaks at the seams are removed (JSON strings cannot contain raw line breaks), and when a
+ * part starts by repeating the end of the previous one (8+ characters, or all of it), the repeat is removed.
+ */
+export function joinParts(parts: string[]): { text: string; overlaps: number[] } {
+  let out = '';
+  const overlaps: number[] = [];
+  parts.forEach((raw, i) => {
+    const p = raw.replace(/^﻿/, '').replace(FENCE_LINE, '');
+    if (i === 0) {
+      out = p.replace(/^[\r\n]+/, '').replace(/[\r\n]+$/, '');
+      return;
+    }
+    const next = p.replace(/^[\r\n]+/, '').replace(/[\r\n]+$/, '');
+    let k = 0;
+    for (let n = Math.min(next.length, out.length, 4000); n >= 1; n--) {
+      // 8+ characters, or the whole previous text repeated (Claude started over).
+      if ((n >= 8 || n === out.length) && out.endsWith(next.slice(0, n))) {
+        k = n;
+        break;
+      }
+    }
+    overlaps.push(k);
+    out += next.slice(k);
+  });
+  return { text: out, overlaps };
+}

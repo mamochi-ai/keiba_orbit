@@ -351,6 +351,15 @@ await cp.getByRole('button', { name: '結果を貼り付け' }).click();
 await cp.getByLabel(/Claudeの応答/).fill('{"schemaVersion":1,"horses":[{"id":"h01","sourceIds":["src-past"\n');
 await cp.getByRole('button', { name: '読み込んで確認' }).click();
 check('paste: cut-off reply explained', (await cp.locator('#paste-error').innerText()).includes('途中で切れています'));
+await cp.getByRole('button', { name: '架空デモの応答を入れる' }).click();
+const full = await cp.getByLabel(/Claudeの応答/).inputValue();
+const cut = Math.floor(full.length / 2);
+await cp.getByLabel(/Claudeの応答/).fill('```json\n' + full.slice(0, cut));
+await cp.getByRole('button', { name: /続きを貼り足す/ }).click();
+await cp.getByLabel(/続き（2つ目）/).fill(full.slice(cut - 12) + '\n```');
+check('paste: parts joined with overlap removed', (await cp.getByText(/2つをつなげて/).innerText()).includes('12 文字を除きました'));
+await cp.getByRole('button', { name: '読み込んで確認' }).click();
+check('paste: two-part reply reaches confirmation', await cp.getByRole('heading', { name: '取り込み内容の確認' }).isVisible());
 await cl.close();
 
 // Empty states in a fresh browser profile
