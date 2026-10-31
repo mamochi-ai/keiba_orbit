@@ -320,4 +320,10 @@ describe('received JRA data (schema 1.0)', () => {
     expect(merged.runners[0]).toMatchObject({ bodyWeightKg: 482 });
     expect(merged.bodyWeightAnnouncedAt).toBe('2026-11-01T14:40:00+09:00');
   });
+
+  it('accepts a descriptive course text (2026-10-31 evening file)', () => {
+    const v = clone();
+    (v.track_conditions[0] as Record<string, unknown>).course = 'Bコース（Aコースから直線部4メートル、曲線部3メートル外に内柵を設置）';
+    expect(parsed(v).tracks[0]!.course).toContain('Bコース');
+  });
 });
