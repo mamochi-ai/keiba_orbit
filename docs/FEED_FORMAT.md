@@ -28,6 +28,8 @@ KEIBA ORBIT の「受け取ったデータ」画面で取り込むJSONの形式�
 | `source_url` | URL / null | 出馬表の出典 |
 | `win_odds_updated_at_jst` | ISO日時（+09:00） / null | 単勝オッズの情報時点 |
 | `win_odds_source_url` | URL / null | 単勝オッズの出典 |
+| `body_weight_announced_at_jst` | ISO日時 / null | 当日馬体重の発表時点 |
+| `result` | オブジェクト / null | レース後の公式結果（下記） |
 | `runners` | 配列 | 出走馬（最大18頭） |
 | `wide_odds` | オブジェクト / null | ワイドオッズ |
 
@@ -45,6 +47,10 @@ KEIBA ORBIT の「受け取ったデータ」画面で取り込むJSONの形式�
 | `win_odds` | 数値 / null | 単勝オッズ（取消馬は null） |
 | `popularity` | 整数 / null | 単勝人気 |
 | `past_runs` | 配列 | 過去成績。**新しい順に最大4件** |
+| `sire` / `dam` / `dam_sire` | 文字列 / null | 父・母・母の父 |
+| `trainer` / `trainer_affiliation` | 文字列 / null | 調教師・所属（美浦・栗東など） |
+| `body_weight_kg` | 整数 / null | **当日の馬体重**（発表前は null）。斤量とは別 |
+| `body_weight_diff_kg` | 整数 / null | 前走からの増減（例 +4、-6、0） |
 
 ### runners[].past_runs[]（すべて null 可）
 
@@ -61,6 +67,18 @@ KEIBA ORBIT の「受け取ったデータ」画面で取り込むJSONの形式�
 | `is_final` | boolean / null | 確定オッズか |
 | `pairs` | 配列 | `horse_number_1`、`horse_number_2`、`odds_min`、`odds_max`（null可）。組ごとの `source_updated_at_jst`・`source_url` も可 |
 | `reason` | 文字列（任意） | 補足 |
+
+### races[].result（レース後）
+
+| 項目 | 型 | 内容 |
+| --- | --- | --- |
+| `status` | 文字列 | 例：確定、一部取得 |
+| `confirmed_at_jst` | ISO日時 / null | 確定時刻 |
+| `source_url` | URL / null | 出典 |
+| `finish_order` | 配列 | `horse_number` と `finish`（着順の整数、または「中止」「除外」「取消」など） |
+| `payouts` | オブジェクト / null | `win`：`horse_number`・`yen`、`wide`：`horse_number_1`・`horse_number_2`・`yen`（いずれも100円あたりの払戻金。同着は複数件） |
+
+結果を取り込むと、「保存した分析」の収支記録に払戻額の計算結果が出ます（記録するかは利用者が決める）。結果や当日馬体重は、後から届いたファイルに含まれていなくても消えません。
 
 ## track_conditions[]
 

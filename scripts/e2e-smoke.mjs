@@ -365,6 +365,48 @@ await cp.getByRole('button', { name: '読み込んで確認' }).click();
 check('paste: two-part reply reaches confirmation', await cp.getByRole('heading', { name: '取り込み内容の確認' }).isVisible());
 await cl.close();
 
+// Official result → suggested payout on the saved analysis (real data)
+const rs = await browser.newContext({ viewport: { width: 1024, height: 900 } });
+await rs.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(base).origin });
+const rp = await rs.newPage();
+const liveFeed = JSON.parse(readFileSync(new URL('../src/test/feed-extended-example.json', import.meta.url), 'utf8'));
+liveFeed.sample = false;
+await rp.goto(base + '#/feed');
+await rp.getByLabel('受け取りデータ（JSON）').fill(JSON.stringify(liveFeed));
+await rp.getByRole('button', { name: '取り込む', exact: true }).click();
+await rp.locator('.ok-box').first().waitFor();
+await rp.locator('section:has(#feed-live) .saved-item a', { hasText: 'テスト記念' }).click();
+await rp.getByRole('heading', { name: /テスト記念/ }).waitFor();
+check('feed race: result and race-day weight shown', (await rp.getByRole('heading', { name: 'レース結果' }).isVisible()) && (await rp.locator('.feed-runner').first().innerText()).includes('482kg'));
+await rp.getByRole('button', { name: 'このレースで分析を準備' }).click();
+await rp.waitForURL(/prepare/);
+await rp.getByLabel('分析対象と情報締切を確認しました').check();
+await rp.getByRole('button', { name: '分析用コピー' }).click();
+await rp.waitForSelector('text=コピーしました');
+const rprompt = await rp.evaluate(() => navigator.clipboard.readText());
+const rsnap = JSON.parse(rprompt.slice(rprompt.indexOf('【入力】') + 4));
+const rresp = {
+  schemaVersion: 1, raceId: rsnap.race.id, snapshotId: rsnap.snapshotId, isDemo: false, status: 'provisional', summary: '【推測】h01を中心に。',
+  horses: [{ id: 'h01', reasons: ['r'], concerns: [], sourceIds: [] }],
+  scenarios: [{ id: 'base', status: 'analyzed', order: ['h01', 'h04'], reason: 'x' }],
+  // 3 runners after the scratch: JRA sells no ワイド, so 単勝 only.
+  bets: [{ type: 'win', horseIds: ['h01'], amount: 1000, reason: '', odds: null, oddsAt: null }, { type: 'win', horseIds: ['h02'], amount: 1000, reason: '', odds: null, oddsAt: null }],
+  budget: 30000, spent: 2000, unspent: 28000, maxLoss: 2000, calculation: { executed: false, method: '' }, limitations: [], reviewTriggers: [], sourceIds: [],
+};
+await rp.getByRole('button', { name: '結果を貼り付け' }).click();
+await rp.getByLabel(/Claudeの応答/).fill(JSON.stringify(rresp));
+await rp.getByRole('button', { name: '読み込んで確認' }).click();
+await rp.getByRole('button', { name: 'この内容で保存してレポートを表示' }).click();
+await rp.waitForSelector('.verdict');
+await rp.goto(base + '#/saved');
+await rp.locator('.saved-item').first().waitFor();
+await rp.locator('.saved-item summary', { hasText: 'レース後の記録' }).first().click();
+const sug = await rp.locator('.saved-item .ok-box').first().innerText();
+check('saved: payout computed from the official result', sug.includes('¥3,200') && sug.includes('単勝 1番 ¥3,200') && sug.includes('+¥1,200'), sug);
+await rp.getByRole('button', { name: 'この金額を入れる' }).click();
+check('saved: suggestion fills the payout field (not recorded yet)', (await rp.getByLabel(/払戻額の合計/).inputValue()) === '3200');
+await rs.close();
+
 // Empty states in a fresh browser profile
 const fresh = await browser.newContext({ viewport: { width: 390, height: 844 } });
 const f = await fresh.newPage();

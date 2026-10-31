@@ -296,4 +296,28 @@ describe('received JRA data (schema 1.0)', () => {
     expect(msgs).toContain('距離に範囲外の値が1件');
     expect(msgs).toContain('馬体重に範囲外の値が1件');
   });
+
+  it('race-day 馬体重, pedigree, trainer and the official result', () => {
+    const race = parsed(extended).races[0]!;
+    expect(race.bodyWeightAnnouncedAt).toBe('2026-11-01T14:40:00+09:00');
+    expect(race.runners[0]).toMatchObject({ bodyWeightKg: 482, bodyWeightDiffKg: 4, sire: '架空サイアA', damSire: '架空ブルードA', trainer: '架空調教師A', trainerAffiliation: '美浦' });
+    expect(race.runners[1]).toMatchObject({ dam: null, bodyWeightDiffKg: -6 });
+    expect(race.result?.payouts?.wide[0]).toEqual({ a: 1, b: 4, yen: 350 });
+    expect(race.result?.finishOrder[3]).toEqual({ horseNumber: 3, finish: '取消' });
+    const { draft } = feedRaceToDraft({ ...race, sample: false }, []);
+    expect(draft.items.entries.text).toContain('当日馬体重482kg（+4）');
+    expect(draft.items.entries.text).toContain('当日馬体重456kg（-6）');
+    expect(draft.items.entries.text).toContain('父：架空サイアA');
+    expect(draft.items.entries.text).toContain('調教師：架空調教師A（美浦）');
+    expect(draft.items.entries.text).toContain('当日馬体重は2026/11/01 14:40 JST発表');
+    // A later file without result / body weight keeps them.
+    const v = structuredClone(extended) as unknown as { races: Record<string, unknown>[] };
+    delete v.races[0]!.result;
+    delete v.races[0]!.body_weight_announced_at_jst;
+    for (const ru of v.races[0]!.runners as Record<string, unknown>[]) delete ru.body_weight_kg;
+    const merged = mergeRace(race, parsed(v).races[0]!).race;
+    expect(merged.result?.status).toBe('確定');
+    expect(merged.runners[0]).toMatchObject({ bodyWeightKg: 482 });
+    expect(merged.bodyWeightAnnouncedAt).toBe('2026-11-01T14:40:00+09:00');
+  });
 });

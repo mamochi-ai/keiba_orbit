@@ -420,6 +420,11 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
                     {r.age ?? '?'}歳／斤量 {r.weightKg !== null ? `${r.weightKg}kg` : '未取得'}／{r.jockey ?? '騎手未取得'}／枠 {r.bracket ?? '未取得'}
                     {r.retained?.length ? `（前回の値：${r.retained.join('・')}）` : ''}
                   </span>
+                  <span className="hint" style={{ display: 'block', margin: 0 }}>
+                    当日馬体重 {r.bodyWeightKg ? `${r.bodyWeightKg}kg${r.bodyWeightDiffKg !== null && r.bodyWeightDiffKg !== undefined ? `（${r.bodyWeightDiffKg > 0 ? '+' : r.bodyWeightDiffKg === 0 ? '±' : ''}${r.bodyWeightDiffKg}）` : ''}` : '未取得'}
+                    {(r.sire || r.damSire) && `／父 ${r.sire ?? '?'}・母の父 ${r.damSire ?? '?'}`}
+                    {r.trainer && `／${r.trainer}${r.trainerAffiliation ? `（${r.trainerAffiliation}）` : ''}`}
+                  </span>
                   {(r.pastRuns?.length ?? 0) > 0 && (
                     <details className="past-runs">
                       <summary>過去成績 {r.pastRuns.length}走</summary>
@@ -522,6 +527,42 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
           </>
         )}
       </section>
+
+      {race.result && (
+        <section className="sec" aria-labelledby="fr-result">
+          <div className="sec-head">
+            <span className="tag">Result</span>
+            <h2 id="fr-result" className="sec-title">
+              レース結果
+            </h2>
+            <span className="sec-note">
+              {race.result.status}
+              {race.result.confirmedAt ? `（${formatJst(race.result.confirmedAt)}）` : ''}
+            </span>
+          </div>
+          <ol className="plain">
+            {race.result.finishOrder.slice(0, 5).map((f) => {
+              const h = race.runners.find((x) => x.horseNumber === f.horseNumber);
+              return (
+                <li key={f.horseNumber}>
+                  <span className="num">{typeof f.finish === 'number' ? `${f.finish}着` : f.finish}</span>　{f.horseNumber}番 {h?.name ?? ''}
+                </li>
+              );
+            })}
+          </ol>
+          {race.result.payouts ? (
+            <p className="hint">
+              単勝 {race.result.payouts.win.map((w) => `${w.horseNumber}番 ${w.yen.toLocaleString('ja-JP')}円`).join('・') || '—'}／ワイド{' '}
+              {race.result.payouts.wide.map((w) => `${w.a}-${w.b} ${w.yen.toLocaleString('ja-JP')}円`).join('・') || '—'}（100円あたり）
+            </p>
+          ) : (
+            <p className="hint">払戻金は未取得です。</p>
+          )}
+          <p className="hint">
+            出典：<SafeLink href={race.result.sourceUrl} />
+          </p>
+        </section>
+      )}
 
       <section className="sec" aria-labelledby="fr-track">
         <div className="sec-head">

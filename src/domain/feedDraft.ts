@@ -3,9 +3,16 @@
 import { emptyDraft, emptyItems, type Draft } from './draft';
 import { formatRange, matchTrack, trackSummary, type FeedRace, type FeedTrack, type PastRun } from './feed';
 import type { Source } from './schema';
+import { formatJst } from './time';
 
 const na = (v: string | number | null | undefined, unit = '') => (v === null || v === undefined ? '未取得' : `${v}${unit}`);
 const q = (v: string | number | null | undefined, unit = '') => (v === null || v === undefined ? '?' : `${v}${unit}`);
+
+/** 「478kg（+4）」. Unknown parts stay unknown. */
+function bodyWeight(kg: number | null | undefined, diff: number | null | undefined): string {
+  if (kg === null || kg === undefined) return '未取得';
+  return `${kg}kg（${diff === null || diff === undefined ? '増減不明' : diff > 0 ? `+${diff}` : diff === 0 ? '±0' : diff}）`;
+}
 
 /** One past run as a compact line; unknown parts are shown as ? (never filled in). */
 export function pastRunLine(p: PastRun): string {
@@ -53,12 +60,13 @@ export function feedRaceToDraft(race: FeedRace, tracks: FeedTrack[]): { draft: D
   if (race.runners.length) {
     const lines = race.runners.map(
       (r) =>
-        `${r.horseNumber ?? '馬番未発表'} ${r.name}${r.scratched ? '（出走取消）' : ''}　${na(r.sex)}${na(r.age)}歳　斤量${na(r.weightKg, 'kg')}　騎手：${na(r.jockey)}　枠${na(r.bracket)}　単勝${na(r.winOdds)}（${na(r.popularity, '番人気')}）`,
+        `${r.horseNumber ?? '馬番未発表'} ${r.name}${r.scratched ? '（出走取消）' : ''}　${na(r.sex)}${na(r.age)}歳　斤量${na(r.weightKg, 'kg')}　騎手：${na(r.jockey)}　枠${na(r.bracket)}　単勝${na(r.winOdds)}（${na(r.popularity, '番人気')}）` +
+        `　当日馬体重${bodyWeight(r.bodyWeightKg, r.bodyWeightDiffKg)}　父：${na(r.sire)}　母：${na(r.dam)}　母の父：${na(r.damSire)}　調教師：${na(r.trainer)}${r.trainerAffiliation ? `（${r.trainerAffiliation}）` : ''}`,
     );
     items.entries = {
       status: 'ok',
       sourceId: 'src-entries',
-      text: `出走表（斤量は負担重量。馬体重ではありません。確認日 ${race.runnersCheckedOn ?? '不明'}・時刻不明${race.runnersRetained ? '・前回取込の値' : ''}）\n${lines.join('\n')}`,
+      text: `出走表（斤量は負担重量。当日馬体重は${race.bodyWeightAnnouncedAt ? `${formatJst(race.bodyWeightAnnouncedAt)}発表` : '発表時刻不明・未発表なら未取得'}。確認日 ${race.runnersCheckedOn ?? '不明'}・時刻不明${race.runnersRetained ? '・前回取込の値' : ''}）\n${lines.join('\n')}`,
       error: null,
     };
     sources.push(src('src-entries', '出走表', '受取データ（JRA出馬表）', race.sourceUrl, null));
