@@ -74,7 +74,14 @@
               "weight_kg": 57,
               "body_weight_kg": null
             }
-          ]
+          ],
+          "sire": "架空サイアA",
+          "dam": "架空ダムA",
+          "dam_sire": "架空ブルードA",
+          "trainer": "架空調教師A",
+          "trainer_affiliation": "美浦",
+          "body_weight_kg": 482,
+          "body_weight_diff_kg": 4
         },
         {
           "bracket": 2,
@@ -87,7 +94,14 @@
           "scratched": false,
           "win_odds": 5.8,
           "popularity": 2,
-          "past_runs": []
+          "past_runs": [],
+          "sire": "架空サイアB",
+          "dam": null,
+          "dam_sire": "架空ブルードB",
+          "trainer": "架空調教師B",
+          "trainer_affiliation": "栗東",
+          "body_weight_kg": 456,
+          "body_weight_diff_kg": -6
         },
         {
           "bracket": 3,
@@ -141,6 +155,55 @@
             "odds_max": 6.6
           }
         ]
+      },
+      "body_weight_announced_at_jst": "2026-11-01T14:40:00+09:00",
+      "result": {
+        "status": "確定",
+        "confirmed_at_jst": "2026-11-01T15:52:00+09:00",
+        "source_url": "https://www.jra.go.jp/",
+        "finish_order": [
+          {
+            "horse_number": 1,
+            "finish": 1
+          },
+          {
+            "horse_number": 4,
+            "finish": 2
+          },
+          {
+            "horse_number": 2,
+            "finish": 3
+          },
+          {
+            "horse_number": 3,
+            "finish": "取消"
+          }
+        ],
+        "payouts": {
+          "win": [
+            {
+              "horse_number": 1,
+              "yen": 320
+            }
+          ],
+          "wide": [
+            {
+              "horse_number_1": 4,
+              "horse_number_2": 1,
+              "yen": 350
+            },
+            {
+              "horse_number_1": 1,
+              "horse_number_2": 2,
+              "yen": 210
+            },
+            {
+              "horse_number_1": 2,
+              "horse_number_2": 4,
+              "yen": 520
+            }
+          ]
+        }
       }
     }
   ],

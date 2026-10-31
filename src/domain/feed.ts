@@ -60,6 +60,34 @@ const runnerSchema = z.object({
   win_odds: opt(z.number().min(1).max(99999)),
   popularity: opt(z.int().min(1).max(18)),
   past_runs: z.array(pastRunSchema).max(10).optional(),
+  // Pedigree / stable (from the 出馬表)
+  sire: opt(str(40)),
+  dam: opt(str(40)),
+  dam_sire: opt(str(40)),
+  trainer: opt(str(40)),
+  trainer_affiliation: opt(str(20)),
+  // Race-day 馬体重 (not 斤量). Time is race-level: body_weight_announced_at_jst.
+  body_weight_kg: opt(z.int().min(300).max(700)),
+  body_weight_diff_kg: opt(z.int().min(-100).max(100)),
+});
+
+/** Official result after the race: finishing order and 単勝 / ワイド payouts per 100 yen. */
+const resultSchema = z.object({
+  status: str(60),
+  confirmed_at_jst: opt(isoTime),
+  source_url: url.optional(),
+  finish_order: z
+    .array(z.object({ horse_number: z.int().min(1).max(18), finish: z.union([z.int().min(1).max(18), str(10)]) }))
+    .max(18),
+  payouts: z
+    .object({
+      win: z.array(z.object({ horse_number: z.int().min(1).max(18), yen: z.int().min(70).max(10_000_000) })).max(5),
+      wide: z
+        .array(z.object({ horse_number_1: z.int().min(1).max(18), horse_number_2: z.int().min(1).max(18), yen: z.int().min(70).max(10_000_000) }))
+        .max(10),
+    })
+    .nullable()
+    .optional(),
 });
 
 const pairSchema = z.object({
@@ -97,6 +125,8 @@ const raceSchema = z.object({
   wide_odds: wideSchema.nullable().optional(),
   win_odds_updated_at_jst: opt(isoTime),
   win_odds_source_url: url.optional(),
+  body_weight_announced_at_jst: opt(isoTime),
+  result: resultSchema.nullable().optional(),
 });
 
 const sideSchema = z.object({ finish: z.number().min(0).max(100).nullable(), turn4: z.number().min(0).max(100).nullable() });
@@ -193,8 +223,25 @@ export interface FeedRunner {
   popularity: number | null;
   /** Newest first, as received (max 4 used). */
   pastRuns: PastRun[];
+  sire?: string | null;
+  dam?: string | null;
+  damSire?: string | null;
+  trainer?: string | null;
+  trainerAffiliation?: string | null;
+  /** Race-day 馬体重 and change from the last run (null = not announced / unknown). */
+  bodyWeightKg?: number | null;
+  bodyWeightDiffKg?: number | null;
   /** Fields that came from an earlier import because this import had null. */
   retained?: string[];
+}
+
+export interface FeedResult {
+  status: string;
+  confirmedAt: string | null;
+  sourceUrl: string | null;
+  finishOrder: { horseNumber: number; finish: number | string }[];
+  /** Per 100 yen. null = payouts not received. */
+  payouts: { win: { horseNumber: number; yen: number }[]; wide: { a: number; b: number; yen: number }[] } | null;
 }
 
 export interface WidePair {
@@ -252,6 +299,8 @@ export interface FeedRace {
   /** 単勝オッズの情報時点・出典 (race level). */
   winOddsUpdatedAt: string | null;
   winOddsSourceUrl: string | null;
+  bodyWeightAnnouncedAt?: string | null;
+  result?: FeedResult | null;
   checkedOn: string | null;
   importedAt: string;
 }
@@ -474,12 +523,34 @@ export function parseFeed(value: unknown, importedAt: string): { ok: true; feed:
           winOdds: ru.win_odds ?? null,
           popularity: ru.popularity ?? null,
           pastRuns: (ru.past_runs ?? []).slice(0, 4),
+          sire: ru.sire ?? null,
+          dam: ru.dam ?? null,
+          damSire: ru.dam_sire ?? null,
+          trainer: ru.trainer ?? null,
+          trainerAffiliation: ru.trainer_affiliation ?? null,
+          bodyWeightKg: ru.body_weight_kg ?? null,
+          bodyWeightDiffKg: ru.body_weight_diff_kg ?? null,
         }))
         // Numbered runners by 馬番; unnumbered ones keep the received order after them.
         .sort((a, b) => (a.horseNumber ?? Infinity) - (b.horseNumber ?? Infinity)),
       runnersCheckedOn: raw.runners.length ? f.checked_on_jst : null,
       winOddsUpdatedAt: raw.win_odds_updated_at_jst ?? null,
       winOddsSourceUrl: raw.win_odds_source_url ?? null,
+      bodyWeightAnnouncedAt: raw.body_weight_announced_at_jst ?? null,
+      result: raw.result
+        ? {
+            status: raw.result.status,
+            confirmedAt: raw.result.confirmed_at_jst ?? null,
+            sourceUrl: raw.result.source_url ?? null,
+            finishOrder: raw.result.finish_order.map((f) => ({ horseNumber: f.horse_number, finish: f.finish })),
+            payouts: raw.result.payouts
+              ? {
+                  win: raw.result.payouts.win.map((w) => ({ horseNumber: w.horse_number, yen: w.yen })),
+                  wide: raw.result.payouts.wide.map((w) => ({ a: Math.min(w.horse_number_1, w.horse_number_2), b: Math.max(w.horse_number_1, w.horse_number_2), yen: w.yen })),
+                }
+              : null,
+          }
+        : null,
       wide,
       checkedOn: f.checked_on_jst,
       importedAt,
@@ -566,6 +637,9 @@ export function mergeRace(existing: FeedRace | undefined, incoming: FeedRace): {
       race.winOddsUpdatedAt = existing.winOddsUpdatedAt ?? null;
       race.winOddsSourceUrl = existing.winOddsSourceUrl ?? null;
     }
+    if (!incoming.runners.some((r) => r.bodyWeightKg !== null && r.bodyWeightKg !== undefined)) race.bodyWeightAnnouncedAt = existing.bodyWeightAnnouncedAt ?? null;
+    // A result, once received, is not removed by a later file without one.
+    if (!incoming.result && existing.result) race.result = existing.result;
 
     if (incoming.runners.length === 0 && existing.runners.length > 0) {
       race.runners = existing.runners;
@@ -589,6 +663,13 @@ export function mergeRace(existing: FeedRace | undefined, incoming: FeedRace): {
           scratched: pickKeep(ru.scratched, old.scratched ?? null, '取消', r),
           winOdds: pickKeep(ru.winOdds, old.winOdds ?? null, '単勝オッズ', r),
           popularity: pickKeep(ru.popularity, old.popularity ?? null, '人気', r),
+          sire: pickKeep(ru.sire ?? null, old.sire ?? null, '父', r),
+          dam: pickKeep(ru.dam ?? null, old.dam ?? null, '母', r),
+          damSire: pickKeep(ru.damSire ?? null, old.damSire ?? null, '母の父', r),
+          trainer: pickKeep(ru.trainer ?? null, old.trainer ?? null, '調教師', r),
+          trainerAffiliation: pickKeep(ru.trainerAffiliation ?? null, old.trainerAffiliation ?? null, '所属', r),
+          bodyWeightKg: pickKeep(ru.bodyWeightKg ?? null, old.bodyWeightKg ?? null, '馬体重', r),
+          bodyWeightDiffKg: pickKeep(ru.bodyWeightDiffKg ?? null, old.bodyWeightDiffKg ?? null, '馬体重増減', r),
           pastRuns: ru.pastRuns.length ? ru.pastRuns : (old.pastRuns?.length ? (r.push('過去成績'), old.pastRuns) : []),
           ...(r.length ? { retained: r } : {}),
         };
@@ -711,6 +792,15 @@ export function normalizeStoredRace(r: FeedRace): FeedRace {
       winOdds: ru.winOdds ?? null,
       popularity: ru.popularity ?? null,
       pastRuns: ru.pastRuns ?? [],
+      sire: ru.sire ?? null,
+      dam: ru.dam ?? null,
+      damSire: ru.damSire ?? null,
+      trainer: ru.trainer ?? null,
+      trainerAffiliation: ru.trainerAffiliation ?? null,
+      bodyWeightKg: ru.bodyWeightKg ?? null,
+      bodyWeightDiffKg: ru.bodyWeightDiffKg ?? null,
     })),
+    bodyWeightAnnouncedAt: r.bodyWeightAnnouncedAt ?? null,
+    result: r.result ?? null,
   };
 }

@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
 import { computeTotals, formatYen } from '../domain/money';
 import type { SavedAnalysis, Settlement } from '../domain/schema';
 import { formatDateJa, formatJst, nowIso } from '../domain/time';
-import { addAnalysis, deleteAnalysis, deleteSettlement, listAnalyses, listSettlements, putSettlement } from '../storage/db';
+import { addAnalysis, deleteAnalysis, deleteSettlement, listAnalyses, listFeedRaces, listSettlements, putSettlement } from '../storage/db';
+import { raceIdentity, type FeedRace } from '../domain/feed';
+import { settleFromResult } from '../domain/settle';
 import { buildExport, parseImport } from '../storage/transfer';
 import { DemoBadge, downloadText, EmptyState, Icon } from '../ui/common';
 import { signedYen, STATUS_LABELS } from './reportParts';
@@ -10,6 +12,7 @@ import { signedYen, STATUS_LABELS } from './reportParts';
 export function Saved() {
   const [items, setItems] = useState<SavedAnalysis[] | null>(null);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [feedRaces, setFeedRaces] = useState<FeedRace[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [importMsg, setImportMsg] = useState<{ kind: 'ok' | 'error'; lines: string[] } | null>(null);
 
@@ -17,6 +20,7 @@ export function Saved() {
     try {
       setItems(await listAnalyses());
       setSettlements(await listSettlements());
+      setFeedRaces(await listFeedRaces().catch(() => []));
       setLoadError(null);
     } catch {
       setItems([]);
@@ -148,7 +152,13 @@ export function Saved() {
         ) : (
           <ul className="saved-list">
             {items.map((a) => (
-              <SavedRow key={a.id} a={a} settlement={settlements.find((s) => s.analysisId === a.id)} onChanged={reload} />
+              <SavedRow
+                key={a.id}
+                a={a}
+                settlement={settlements.find((s) => s.analysisId === a.id)}
+                feedRace={resultFor(a, feedRaces)}
+                onChanged={reload}
+              />
             ))}
           </ul>
         )}
@@ -157,7 +167,15 @@ export function Saved() {
   );
 }
 
-function SavedRow({ a, settlement, onChanged }: { a: SavedAnalysis; settlement?: Settlement; onChanged: () => Promise<void> }) {
+/** The received race (real data only) that has an official result for this analysis. */
+function resultFor(a: SavedAnalysis, races: FeedRace[]): FeedRace | undefined {
+  const r = a.snapshot.race;
+  if (a.isDemo || !r.date || !r.venue || !r.number) return undefined;
+  const key = raceIdentity(false, r.date, r.venue, r.number);
+  return races.find((x) => x.key === key && x.result);
+}
+
+function SavedRow({ a, settlement, feedRace, onChanged }: { a: SavedAnalysis; settlement?: Settlement; feedRace?: FeedRace; onChanged: () => Promise<void> }) {
   const spent = computeTotals(a.snapshot.budget, a.response.bets).spent;
   const [payout, setPayout] = useState(settlement ? String(settlement.payout) : '');
   const [memo, setMemo] = useState(settlement?.memo ?? '');
@@ -192,7 +210,17 @@ function SavedRow({ a, settlement, onChanged }: { a: SavedAnalysis; settlement?:
         </div>
       </div>
       <details className="subgroup mt">
-        <summary>レース後の記録{settlement ? `（記録済：${signedYen(settlement.payout - spent)}）` : ''}</summary>
+        <summary>レース後の記録{settlement ? `（記録済：${signedYen(settlement.payout - spent)}）` : feedRace ? '（結果あり）' : ''}</summary>
+        {feedRace?.result && (
+          <ResultSuggestion
+            a={a}
+            race={feedRace}
+            onUse={(yen, note) => {
+              setPayout(String(yen));
+              if (!memo.trim()) setMemo(note);
+            }}
+          />
+        )}
         <p className="hint">予想時点の内容は変更されません。払戻額は実際の結果から入力してください。</p>
         <div className="grid-2">
           <label>
@@ -246,5 +274,35 @@ function SavedRow({ a, settlement, onChanged }: { a: SavedAnalysis; settlement?:
         </div>
       </details>
     </li>
+  );
+}
+
+function ResultSuggestion({ a, race, onUse }: { a: SavedAnalysis; race: FeedRace; onUse: (yen: number, note: string) => void }) {
+  const res = race.result!;
+  const top3 = res.finishOrder
+    .filter((f) => typeof f.finish === 'number' && f.finish <= 3)
+    .map((f) => `${f.finish}着 ${f.horseNumber}番`)
+    .join('・');
+  const s = settleFromResult(a.snapshot, a.response, res);
+  return (
+    <div className="ok-box">
+      <p>
+        <b>受け取った結果</b>（{res.status}）：{top3 || '着順未取得'}
+      </p>
+      {s.ok ? (
+        <>
+          <p>
+            払戻金から計算した払戻額：<b className="num">{formatYen(s.payout)}</b>（収支 {signedYen(s.payout - s.spent)}）
+            {s.hits.length > 0 && <span className="hint">　的中：{s.hits.map((h) => `${h.label} ${formatYen(h.payout)}`).join('・')}</span>}
+          </p>
+          <button type="button" className="btn small" onClick={() => onUse(s.payout, top3)}>
+            この金額を入れる
+          </button>
+          <p className="hint">返還（出走取消など）は含みません。入れた後、内容を確かめて「記録する」を押してください。</p>
+        </>
+      ) : (
+        <p className="hint">{s.reason}</p>
+      )}
+    </div>
   );
 }
