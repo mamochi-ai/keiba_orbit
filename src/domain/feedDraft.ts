@@ -1,7 +1,7 @@
 // Start an analysis draft from a received race. sample data becomes a 架空デモ draft (kept out of
 // real predictions and the ledger); mock wide odds are never carried into the draft.
 import { emptyDraft, emptyItems, type Draft } from './draft';
-import { formatRange, matchTrack, trackSummary, type FeedRace, type FeedTrack, type PastRun } from './feed';
+import { formatRange, jockeyKey, jockeyLine, matchTrack, trackSummary, type FeedJockey, type FeedRace, type FeedTrack, type PastRun } from './feed';
 import type { Source } from './schema';
 import { formatJst } from './time';
 
@@ -34,7 +34,8 @@ export function pastRunLine(p: PastRun): string {
   ].join(' ');
 }
 
-export function feedRaceToDraft(race: FeedRace, tracks: FeedTrack[]): { draft: Draft; notes: string[] } {
+export function feedRaceToDraft(race: FeedRace, tracks: FeedTrack[], jockeys: FeedJockey[] = []): { draft: Draft; notes: string[] } {
+  const jockeyOf = (name: string | null) => (name ? jockeys.find((j) => j.sample === race.sample && j.key === jockeyKey(race.sample, name)) : undefined);
   const demo = race.sample;
   const prefix = demo ? 'demo-h' : 'h';
   const notes: string[] = [];
@@ -61,7 +62,11 @@ export function feedRaceToDraft(race: FeedRace, tracks: FeedTrack[]): { draft: D
     const lines = race.runners.map(
       (r) =>
         `${r.horseNumber ?? '馬番未発表'} ${r.name}${r.scratched ? '（出走取消）' : ''}　${na(r.sex)}${na(r.age)}歳　斤量${na(r.weightKg, 'kg')}　騎手：${na(r.jockey)}　枠${na(r.bracket)}　単勝${na(r.winOdds)}（${na(r.popularity, '番人気')}）` +
-        `　当日馬体重${bodyWeight(r.bodyWeightKg, r.bodyWeightDiffKg)}　父：${na(r.sire)}　母：${na(r.dam)}　母の父：${na(r.damSire)}　調教師：${na(r.trainer)}${r.trainerAffiliation ? `（${r.trainerAffiliation}）` : ''}`,
+        `　当日馬体重${bodyWeight(r.bodyWeightKg, r.bodyWeightDiffKg)}　父：${na(r.sire)}　母：${na(r.dam)}　母の父：${na(r.damSire)}　調教師：${na(r.trainer)}${r.trainerAffiliation ? `（${r.trainerAffiliation}）` : ''}` +
+        `　騎手成績：${(() => {
+          const j = jockeyOf(r.jockey);
+          return j ? jockeyLine(j) : '未取得';
+        })()}`,
     );
     items.entries = {
       status: 'ok',
@@ -126,6 +131,12 @@ export function feedRaceToDraft(race: FeedRace, tracks: FeedTrack[]): { draft: D
       error: null,
     };
     sources.push(src('src-past', '過去成績', '受取データ（JRA出馬表・過去成績）', race.sourceUrl, null));
+  }
+
+  const matchedJ = race.runners.map((r) => jockeyOf(r.jockey)).filter((j): j is FeedJockey => Boolean(j));
+  if (matchedJ.length) {
+    const first = matchedJ[0]!;
+    sources.push(src('src-jockeys', '騎手成績', '受取データ（JRA騎手データ）', first.sourceUrl, first.asOf));
   }
 
   const unnumbered = race.runners.filter((r) => r.horseNumber === null).length;

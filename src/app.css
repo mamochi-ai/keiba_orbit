@@ -343,6 +343,7 @@ details.subgroup > summary { min-height: 44px; display: flex; align-items: cente
 .compare { list-style: none; padding: 0; margin: 0; }
 .compare li { display: grid; grid-template-columns: 11em minmax(0, 1fr); gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .compare-label { color: var(--text-2); font-weight: 700; }
+.compare .block { display: block; }
 .settings { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 0 44px; align-items: start; }
 .about-tags { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
 

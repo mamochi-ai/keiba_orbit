@@ -3,7 +3,8 @@ import { computeTotals, formatYen } from '../domain/money';
 import type { SavedAnalysis, Settlement } from '../domain/schema';
 import { formatDateJa, formatJst, nowIso } from '../domain/time';
 import { addAnalysis, deleteAnalysis, deleteSettlement, listAnalyses, listFeedRaces, listSettlements, putSettlement } from '../storage/db';
-import { raceIdentity, type FeedRace } from '../domain/feed';
+import type { FeedRace } from '../domain/feed';
+import { findResultRace, reviewStats } from '../domain/review';
 import { settleFromResult } from '../domain/settle';
 import { buildExport, parseImport } from '../storage/transfer';
 import { DemoBadge, downloadText, EmptyState, Icon } from '../ui/common';
@@ -71,6 +72,8 @@ export function Saved() {
     .filter((x): x is { a: SavedAnalysis; s: Settlement } => Boolean(x.s));
   const totalSpent = settled.reduce((t, x) => t + computeTotals(x.a.snapshot.budget, x.a.response.bets).spent, 0);
   const totalPayout = settled.reduce((t, x) => t + x.s.payout, 0);
+  const stats = reviewStats(real, feedRaces);
+  const pct = (n: number, d: number) => (d ? `${Math.round((n / d) * 100)}%` : '—');
 
   return (
     <>
@@ -138,6 +141,45 @@ export function Saved() {
         <p className="hint">架空デモの記録は収支履歴に含めません。</p>
       </section>
 
+      <section className="sec" aria-labelledby="review-stats">
+        <div className="sec-head">
+          <span className="tag">Review</span>
+          <h2 id="review-stats" className="sec-title">
+            振り返り
+          </h2>
+          <span className="sec-note">受け取った公式結果・払戻金から計算</span>
+        </div>
+        {stats.races === 0 ? (
+          <p className="muted">結果と照らし合わせられる分析はまだありません。結果（着順・払戻金）を含むデータを「受け取ったデータ」から取り込むと、ここに集計されます。</p>
+        ) : (
+          <div className="ledger metrics">
+            <div className="metric-box">
+              <span className="k">照合したレース</span>
+              <span className="v">{stats.races}件</span>
+            </div>
+            <div className="metric-box">
+              <span className="k">中心候補の3着内率</span>
+              <span className="v">
+                {pct(stats.centerTop3, stats.centerKnown)}
+                <span className="hint"> （{stats.centerTop3}/{stats.centerKnown}）</span>
+              </span>
+            </div>
+            <div className="metric-box">
+              <span className="k">的中率（レース単位）</span>
+              <span className="v">
+                {pct(stats.hitRaces, stats.races)}
+                <span className="hint"> （{stats.hitRaces}/{stats.races}）</span>
+              </span>
+            </div>
+            <div className="metric-box">
+              <span className="k">回収率</span>
+              <span className="v">{pct(stats.payout, stats.spent)}</span>
+            </div>
+          </div>
+        )}
+        <p className="hint">同じレースを再分析した場合は、最新の版だけを数えます。件数が少ないうちは偶然の影響が大きく、今後の成績を示すものではありません。</p>
+      </section>
+
       <section className="sec" aria-label="保存した分析の一覧">
         {items === null ? (
           <p className="row">
@@ -156,7 +198,7 @@ export function Saved() {
                 key={a.id}
                 a={a}
                 settlement={settlements.find((s) => s.analysisId === a.id)}
-                feedRace={resultFor(a, feedRaces)}
+                feedRace={findResultRace(a, feedRaces)}
                 onChanged={reload}
               />
             ))}
@@ -165,14 +207,6 @@ export function Saved() {
       </section>
     </>
   );
-}
-
-/** The received race (real data only) that has an official result for this analysis. */
-function resultFor(a: SavedAnalysis, races: FeedRace[]): FeedRace | undefined {
-  const r = a.snapshot.race;
-  if (a.isDemo || !r.date || !r.venue || !r.number) return undefined;
-  const key = raceIdentity(false, r.date, r.venue, r.number);
-  return races.find((x) => x.key === key && x.result);
 }
 
 function SavedRow({ a, settlement, feedRace, onChanged }: { a: SavedAnalysis; settlement?: Settlement; feedRace?: FeedRace; onChanged: () => Promise<void> }) {

@@ -4,9 +4,9 @@ import sample from '../test/feed-sample.json';
 import received from '../test/feed-received-2026-10-28.json';
 import extended from '../test/feed-extended-example.json';
 import { normalizeStoredRace, unnumberedRunners } from './feed';
-import { formatRange, matchTrack, mergeRace, parseFeed, type FeedRace } from './feed';
+import { formatRange, jockeyLine, matchTrack, mergeJockey, mergeRace, normalizeJockeyName, parseFeed, type FeedRace } from './feed';
 import { feedRaceToDraft } from './feedDraft';
-import { applyFeed, listFeedRaces, listFeedTracks } from '../storage/db';
+import { applyFeed, listFeedJockeys, listFeedRaces, listFeedTracks } from '../storage/db';
 import { buildSnapshot } from './draft';
 import { parseSnapshot } from './validate';
 
@@ -333,5 +333,34 @@ describe('received JRA data (schema 1.0)', () => {
     expect(matchTrack([{ ...t, goingAsOf: null }], race)).toMatchObject({ current: true, reason: expect.stringContaining('発表時刻は不明') });
     expect(matchTrack([t], race)?.current).toBe(false); // 10/23 12:00 shown on the 10/25 page
     expect(matchTrack([{ ...t, goingAsOf: null, pageRaceDate: '2026-10-24' }], race)?.current).toBe(false);
+  });
+
+  it('jockey season stats: parsed, matched by normalized name, shown in the entries with time and source', async () => {
+    const v = structuredClone(extended) as unknown as Record<string, unknown>;
+    v.jockey_stats = [
+      { name: '★架空騎手Ａ', year: 2026, rides: 400, first: 60, second: 50, third: 40, as_of_jst: '2026-10-31T18:00:00+09:00', source_url: 'https://www.jra.go.jp/datafile/leading/' },
+    ];
+    const f = parsed(v);
+    expect(f.issues.filter((i) => i.message.includes('jockey'))).toEqual([]);
+    expect(f.jockeys).toHaveLength(1);
+    expect(normalizeJockeyName('▲ 架空騎手Ａ')).toBe('架空騎手A');
+    expect(jockeyLine(f.jockeys[0]!)).toBe('2026年 騎乗400・1着60（勝率15.0%・複勝率37.5%）2026/10/31 18:00 JST時点');
+    const { draft } = feedRaceToDraft(f.races[0]!, f.tracks, f.jockeys);
+    expect(draft.items.entries.text).toContain('騎手成績：2026年 騎乗400・1着60');
+    expect(draft.items.entries.text).toContain('騎手成績：未取得'); // 架空騎手C has no record
+    expect(draft.sources.some((x) => x.id === 'src-jockeys')).toBe(true);
+    // Without stats nothing is invented.
+    expect(feedRaceToDraft(f.races[0]!, f.tracks).draft.items.entries.text).not.toContain('勝率');
+
+    const res = await applyFeed(f);
+    expect(res.jockeys).toBe(1);
+    expect((await listFeedJockeys()).find((j) => j.name === '★架空騎手Ａ')).toMatchObject({ rides: 400, sample: true });
+  });
+
+  it('jockey stats: an older record does not replace a newer one; unknown counts keep known values', () => {
+    const base = { key: 'live|X', sample: false, name: 'X', year: 2026, rides: 100, first: 10, second: 10, third: 10, asOf: '2026-10-31T18:00:00+09:00', sourceUrl: null, importedAt: T };
+    expect(mergeJockey(base, { ...base, rides: 90, asOf: '2026-10-24T18:00:00+09:00' }).rides).toBe(100);
+    expect(mergeJockey(base, { ...base, rides: 110, first: null, asOf: '2026-11-01T18:00:00+09:00' })).toMatchObject({ rides: 110, first: 10 });
+    expect(jockeyLine({ ...base, rides: null, asOf: null })).toBe('2026年 騎乗不明・1着10（勝率不明・複勝率不明）時点不明');
   });
 });

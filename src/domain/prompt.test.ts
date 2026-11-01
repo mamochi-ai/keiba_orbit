@@ -13,6 +13,15 @@ describe('prompts', () => {
     expect(p.startsWith('あなたは出典を明示する競馬分析担当です。')).toBe(true);
   });
 
+  it('asks for a full ranking, popularity gaps, jockey changes and bets that survive one horse failing', () => {
+    const p = buildAnalysisPrompt(realSnapshot());
+    expect(p).toContain('全出走馬（出走取消を除く）を評価する');
+    expect(p).toContain('【人気との差】');
+    expect(p).toContain('乗り替わり');
+    expect(p).toContain('特定の1頭が4着以下になっただけで全部外れる構成にしない');
+    expect(p.indexOf('精度を上げるための追加ルール')).toBeLessThan(p.indexOf('以下のJSON構造に従ってJSONのみ返す。'));
+  });
+
   it('note prompt ends exactly with the footer and nothing after it', () => {
     const s = realSnapshot();
     const saved: SavedAnalysis = {

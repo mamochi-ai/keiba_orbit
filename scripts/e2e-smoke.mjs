@@ -226,7 +226,9 @@ const odds = r.locator('details.item:not(.card-import)', { has: r.locator('.item
 await odds.locator('summary.item-head').click();
 await odds.locator('textarea').fill('1 3.2\n1-2 2.1-2.8');
 await odds.getByLabel('提供者').fill('手入力テスト');
-await odds.getByLabel('対象時点（JST）').fill('2026-11-01T14:30');
+// A few minutes ago in JST, so the odds are never judged stale whatever day the check runs.
+const jstNow = new Date(Date.now() + 9 * 3600_000 - 5 * 60_000).toISOString().slice(0, 16);
+await odds.getByLabel('対象時点（JST）').fill(jstNow);
 await odds.getByLabel('元URL（http/https）').fill('javascript:alert(1)');
 await odds.getByRole('button', { name: 'この内容で反映' }).click();
 check('prepare: dangerous URL rejected', (await odds.locator('.error-box').innerText()).includes('http://'));
@@ -371,6 +373,7 @@ await rs.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new U
 const rp = await rs.newPage();
 const liveFeed = JSON.parse(readFileSync(new URL('../src/test/feed-extended-example.json', import.meta.url), 'utf8'));
 liveFeed.sample = false;
+liveFeed.jockey_stats = [{ name: '架空騎手A', year: 2026, rides: 400, first: 60, second: 50, third: 40, as_of_jst: '2026-10-31T18:00:00+09:00', source_url: 'https://www.jra.go.jp/datafile/leading/' }];
 await rp.goto(base + '#/feed');
 await rp.getByLabel('受け取りデータ（JSON）').fill(JSON.stringify(liveFeed));
 await rp.getByRole('button', { name: '取り込む', exact: true }).click();
@@ -385,6 +388,8 @@ await rp.getByRole('button', { name: '分析用コピー' }).click();
 await rp.waitForSelector('text=コピーしました');
 const rprompt = await rp.evaluate(() => navigator.clipboard.readText());
 const rsnap = JSON.parse(rprompt.slice(rprompt.indexOf('【入力】') + 4));
+check('prompt: jockey season stats passed with time; unknown jockeys say 未取得', rprompt.includes('騎手成績：2026年 騎乗400・1着60（勝率15.0%・複勝率37.5%）') && rprompt.includes('騎手成績：未取得'));
+check('prompt: precision rules (全出走馬・人気との差・乗り替わり)', rprompt.includes('全出走馬（出走取消を除く）を評価する') && rprompt.includes('【人気との差】') && rprompt.includes('乗り替わり'));
 const rresp = {
   schemaVersion: 1, raceId: rsnap.race.id, snapshotId: rsnap.snapshotId, isDemo: false, status: 'provisional', summary: '【推測】h01を中心に。',
   horses: [{ id: 'h01', reasons: ['r'], concerns: [], sourceIds: [] }],
@@ -398,8 +403,20 @@ await rp.getByLabel(/Claudeの応答/).fill(JSON.stringify(rresp));
 await rp.getByRole('button', { name: '読み込んで確認' }).click();
 await rp.getByRole('button', { name: 'この内容で保存してレポートを表示' }).click();
 await rp.waitForSelector('.verdict');
+await rp.locator('.result-review').waitFor({ timeout: 5000 }).catch(() => {});
+const rv = (await rp.locator('.result-review').count()) ? await rp.locator('.result-review').innerText() : '';
+check('report: result review shows centre finish, bets and balance', rv.includes('結果との照らし合わせ') && rv.includes('1番') && rv.includes('1着') && rv.includes('的中 払戻¥3,200') && rv.includes('不的中') && rv.includes('+¥1,200'), rv);
+for (const w of [390, 1024]) {
+  await rp.setViewportSize({ width: w, height: 844 });
+  const o = await rp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  check(`report result review: no horizontal overflow at ${w}px`, o <= 0, `overflow=${o}`);
+  if (shots) await rp.locator('.result-review').screenshot({ path: `${shots}/result-review-${w}.png` });
+}
+await rp.setViewportSize({ width: 1024, height: 900 });
 await rp.goto(base + '#/saved');
 await rp.locator('.saved-item').first().waitFor();
+const stats = await rp.locator('section:has(#review-stats)').innerText();
+check('saved: review stats (centre top-3, hit rate, recovery) from official payouts', stats.includes('100%') && stats.includes('（1/1）') && stats.includes('160%'), stats);
 await rp.locator('.saved-item summary', { hasText: 'レース後の記録' }).first().click();
 const sug = await rp.locator('.saved-item .ok-box').first().innerText();
 check('saved: payout computed from the official result', sug.includes('¥3,200') && sug.includes('単勝 1番 ¥3,200') && sug.includes('+¥1,200'), sug);

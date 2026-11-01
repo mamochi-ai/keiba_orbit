@@ -2,6 +2,7 @@
 // the confirmation screen and the report.
 import {
   analysisResponseSchema,
+  SCENARIO_LABELS,
   formatZodIssues,
   raceSnapshotSchema,
   type AnalysisResponse,
@@ -117,9 +118,9 @@ export function checkResponse(snapshot: RaceSnapshot, value: unknown): ResponseC
     const inOrder = new Set<string>();
     for (const id of sc.order) {
       const h = known.get(id);
-      if (!h) issues.push(error(`条件「${sc.id}」の順位に出走していない馬ID「${id}」があります`));
-      else if (h.scratched) issues.push(warning(`条件「${sc.id}」の順位に出走取消の${horseLabel(snapshot, id)}が含まれています`));
-      if (inOrder.has(id)) issues.push(error(`条件「${sc.id}」の順位に同じ馬が重複しています`));
+      if (!h) issues.push(error(`条件「${SCENARIO_LABELS[sc.id]}」の順位に出走していない馬ID「${id}」があります`));
+      else if (h.scratched) issues.push(warning(`条件「${SCENARIO_LABELS[sc.id]}」の順位に出走取消の${horseLabel(snapshot, id)}が含まれています`));
+      if (inOrder.has(id)) issues.push(error(`条件「${SCENARIO_LABELS[sc.id]}」の順位に同じ馬が重複しています`));
       inOrder.add(id);
     }
     if (sc.status === 'analyzed' && sc.order.length === 0) issues.push(warning(`条件「${sc.id}」は分析済みですが順位が空です`));
@@ -157,6 +158,18 @@ export function checkResponse(snapshot: RaceSnapshot, value: unknown): ResponseC
   if (res.unspent !== totals.unspent) issues.push(error(`残額が一致しません（応答: ${res.unspent}円 / 再計算: ${totals.unspent}円）`));
   if (res.maxLoss !== totals.maxLoss) issues.push(error(`最大損失が一致しません（応答: ${res.maxLoss}円 / 再計算: ${totals.maxLoss}円）`));
   if (totals.spent > snapshot.budget) issues.push(error(`予算超過です（使用 ${totals.spent}円 > 予算 ${snapshot.budget}円）`));
+
+  // A single horse finishing outside the places should not wipe out every bet.
+  if (res.bets.length >= 2) {
+    const inAll = snapshot.horses.find((h) => res.bets.every((b) => b.horseIds.includes(h.id)));
+    if (inAll) issues.push(warning(`全買い目が${horseLabel(snapshot, inAll.id)}を含んでいます。この馬が崩れると全部外れます`));
+  }
+  const runnersIds = snapshot.horses.filter((h) => !h.scratched).map((h) => h.id);
+  for (const sc of res.scenarios) {
+    if (sc.status !== 'analyzed' || runnersIds.length === 0) continue;
+    const missing = runnersIds.filter((id) => !sc.order.includes(id));
+    if (missing.length) issues.push(warning(`条件「${SCENARIO_LABELS[sc.id]}」の順位に入っていない出走馬が${missing.length}頭います（全頭の順位付けを依頼しています）`));
+  }
 
   if (res.bets.length === 0) {
     issues.push(warning(res.status === 'ready' ? '分析は ready ですが配分が空です（購入なしの判断として扱います）' : '配分は空です'));

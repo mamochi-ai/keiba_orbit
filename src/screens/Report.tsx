@@ -11,6 +11,7 @@ import { CopyButton, EmptyState, Icon, OpenClaudeLink, OrbitVisual, SafeLink } f
 import { SafeMarkdown } from '../ui/SafeMarkdown';
 import { BudgetPanel, Candidates, ScenarioCompare, STATUS_LABELS, SummaryLines, Verdict } from './reportParts';
 import { humanizeIds, splitSummary } from '../domain/reportText';
+import { ResultReview } from './ResultReview';
 
 export function Report({ id }: { id: string }) {
   const [rec, setRec] = useState<SavedAnalysis | null | undefined>(undefined);
@@ -122,6 +123,8 @@ export function Report({ id }: { id: string }) {
           </ul>
         </div>
       )}
+
+      <ResultReview a={rec} />
 
       <div className="report">
         <section className="sec first r-cand" aria-labelledby="cand-title">
