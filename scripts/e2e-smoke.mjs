@@ -208,7 +208,7 @@ await r.locator('#home-number').selectOption('11');
 await r.getByRole('button', { name: '分析を準備' }).click();
 await r.getByRole('heading', { name: /分析準備/ }).waitFor();
 // 出馬表 paste → entries, win odds and past performances in one go
-const card = ['出馬表 2026年11月1日（日曜）4回東京9日 11レース', ...Array.from({ length: 10 }, (_, i) =>
+const card = ['出馬表 2030年1月5日（土曜）1回東京1日 11レース', ...Array.from({ length: 10 }, (_, i) =>
   `枠${Math.min(8, i + 1)}${'白黒赤青黄緑橙桃'[Math.min(7, i)]}\t${i + 1}\tテスト${'アイウエオカキクケコ'[i]}\n${i === 0 ? '3.2' : (5 + i).toFixed(1)} (${i + 1} 番人気 )\n\t牡4/鹿\t2026年9月1日\n中山\n${i + 1} 着`)].join('\n');
 check('prep: empty entries point to received data', await r.getByRole('link', { name: /受け取ったデータからレースを選ぶ/ }).isVisible());
 const cardPanel = r.locator('details.card-import');

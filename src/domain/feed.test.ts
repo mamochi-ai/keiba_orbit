@@ -326,4 +326,12 @@ describe('received JRA data (schema 1.0)', () => {
     (v.track_conditions[0] as Record<string, unknown>).course = 'Bコース（Aコースから直線部4メートル、曲線部3メートル外に内柵を設置）';
     expect(parsed(v).tracks[0]!.course).toContain('Bコース');
   });
+
+  it('race-day page without a going time is race-day information (time unknown); an earlier time is not', () => {
+    const t = parsed(sample).tracks[0]!;
+    const race = { sample: true, venue: '東京' as const, date: '2026-10-25' };
+    expect(matchTrack([{ ...t, goingAsOf: null }], race)).toMatchObject({ current: true, reason: expect.stringContaining('発表時刻は不明') });
+    expect(matchTrack([t], race)?.current).toBe(false); // 10/23 12:00 shown on the 10/25 page
+    expect(matchTrack([{ ...t, goingAsOf: null, pageRaceDate: '2026-10-24' }], race)?.current).toBe(false);
+  });
 });
