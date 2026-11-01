@@ -29,6 +29,16 @@ describe('IndexedDB storage', () => {
 });
 
 describe('JSON export / import', () => {
+  it('points a received JRA data file to the 受け取ったデータ screen instead of listing schema errors', () => {
+    const r = parseImport(JSON.stringify({ schema_version: '1.0', sample: false, checked_on_jst: null, races: [], track_conditions: [] }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.feed).toBe(true);
+      expect(r.errors.join()).toContain('受け取ったデータ');
+      expect(r.errors.join()).not.toContain('keiba-orbit-export');
+    }
+  });
+
   it('round-trips and rejects tampered records', () => {
     const a = rec('a-9', 1);
     const bundle = buildExport([a], [{ analysisId: 'a-9', recordedAt: '2026-11-01T17:00:00+09:00', payout: 0, memo: '不的中' }], '2026-11-02T00:00:00+09:00');

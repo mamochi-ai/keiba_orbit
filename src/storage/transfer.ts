@@ -10,13 +10,24 @@ export function buildExport(analyses: SavedAnalysis[], settlements: Settlement[]
 
 export type ImportResult =
   | { ok: true; analyses: SavedAnalysis[]; settlements: Settlement[]; rejected: string[] }
-  | { ok: false; errors: string[] };
+  | { ok: false; errors: string[]; feed?: boolean };
 
 export function parseImport(text: string): ImportResult {
   if (new Blob([text]).size > MAX_IMPORT_BYTES) return { ok: false, errors: ['ファイルが大きすぎます（上限5MB）'] };
   const syntax = findJsonError(text.replace(/^﻿/, ''));
   if (syntax) return { ok: false, errors: [`JSONの構文エラー（${syntax.index + 1}文字目）: ${syntax.message}`] };
-  const r = exportBundleSchema.safeParse(JSON.parse(text.replace(/^﻿/, '')));
+  const raw: unknown = JSON.parse(text.replace(/^﻿/, ''));
+  if (isReceivedFeed(raw)) {
+    return {
+      ok: false,
+      errors: [
+        'これは「受け取ったデータ」（JRAのレース・結果のデータ）です。ここでは読み込めません。',
+        '「受け取ったデータ」の画面で取り込んでください。',
+      ],
+      feed: true,
+    };
+  }
+  const r = exportBundleSchema.safeParse(raw);
   if (!r.success) return { ok: false, errors: formatZodIssues(r.error) };
   const rejected: string[] = [];
   const analyses = r.data.analyses.filter((a) => {
@@ -39,4 +50,9 @@ export function parseImport(text: string): ImportResult {
     return true;
   });
   return { ok: true, analyses, settlements, rejected };
+}
+
+/** A received JRA data file (schema_version "1.0" with races) picked on the backup-import button by mistake. */
+export function isReceivedFeed(v: unknown): boolean {
+  return typeof v === 'object' && v !== null && !Array.isArray(v) && 'schema_version' in v && ('races' in v || 'track_conditions' in v);
 }
