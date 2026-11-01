@@ -15,7 +15,7 @@ export function Saved() {
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [feedRaces, setFeedRaces] = useState<FeedRace[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [importMsg, setImportMsg] = useState<{ kind: 'ok' | 'error'; lines: string[] } | null>(null);
+  const [importMsg, setImportMsg] = useState<{ kind: 'ok' | 'error'; lines: string[]; feed?: boolean } | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -38,7 +38,7 @@ export function Saved() {
     e.target.value = '';
     if (!file) return;
     const r = parseImport(await file.text());
-    if (!r.ok) return setImportMsg({ kind: 'error', lines: r.errors });
+    if (!r.ok) return setImportMsg({ kind: 'error', lines: r.errors, feed: r.feed });
     const existing = new Set((items ?? []).map((a) => a.id));
     let added = 0;
     const skipped: string[] = [];
@@ -83,7 +83,7 @@ export function Saved() {
           保存した分析
         </h1>
         <p className="muted">
-          分析はこの端末のブラウザ内に保存されます。ブラウザのデータ削除や長期間の未使用で消えることがあるため、ときどき書き出して「ファイル」などに保管してください。
+          「データを書き出す／読み込む」は、このアプリで書き出した分析のバックアップ用です。JRAのレース・結果のデータは「受け取ったデータ」で取り込みます。分析はこの端末のブラウザ内に保存されます。ブラウザのデータ削除や長期間の未使用で消えることがあるため、ときどき書き出して「ファイル」などに保管してください。
         </p>
       </div>
       <div className="row">
@@ -100,6 +100,11 @@ export function Saved() {
           {importMsg.lines.map((l, i) => (
             <p key={i}>{l}</p>
           ))}
+          {importMsg.feed && (
+            <a className="btn primary small mt" href="#/feed">
+              受け取ったデータの画面へ
+            </a>
+          )}
         </div>
       )}
       {loadError && (
