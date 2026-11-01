@@ -750,7 +750,7 @@ export function mergeTrack(existing: FeedTrack | undefined, incoming: FeedTrack)
 
 export type TrackMatch = { track: FeedTrack; current: boolean; reason: string };
 
-/** Only "current" when the page date and the going time are both the race day; otherwise reference. */
+/** "current" when the page is for the race day and the going time is that day or unknown; otherwise reference. */
 export function matchTrack(tracks: FeedTrack[], race: Pick<FeedRace, 'sample' | 'venue' | 'date'>): TrackMatch | null {
   const same = tracks.filter((t) => t.sample === race.sample && t.venue === race.venue);
   if (!same.length) return null;
@@ -758,6 +758,9 @@ export function matchTrack(tracks: FeedTrack[], race: Pick<FeedRace, 'sample' | 
   const track = byDate ?? [...same].sort((a, b) => (b.goingAsOf ?? '').localeCompare(a.goingAsOf ?? ''))[0]!;
   const asOfDay = track.goingAsOf ? new Date(Date.parse(track.goingAsOf) + 9 * 3600_000).toISOString().slice(0, 10) : null;
   if (track.pageRaceDate === race.date && asOfDay === race.date) return { track, current: true, reason: 'レース当日の発表です。' };
+  // The race-day page without a clock time (JRA does not always show one): still that day's
+  // information, but the announcement time stays unknown. A known earlier time is not.
+  if (track.pageRaceDate === race.date && !track.goingAsOf) return { track, current: true, reason: 'レース当日のページの表示です（発表時刻は不明）。' };
   const reason = !track.pageRaceDate || track.pageRaceDate !== race.date
     ? `対象日（${track.pageRaceDate ?? '不明'}）がレース日（${race.date}）と一致しません。`
     : `馬場状態は${track.goingAsOf ? `${formatJst(track.goingAsOf)}時点` : '時点不明'}の表示で、レース当日（${race.date}）の状態ではありません。`;
