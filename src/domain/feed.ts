@@ -150,6 +150,18 @@ const trackSchema = z.object({
   warning: str(500).nullable(),
 });
 
+/** A jockey's season record (JRA 騎手リーディング). Counts only; rates are computed by the app. */
+const jockeyStatSchema = z.object({
+  name: str(40).min(1),
+  year: opt(z.int().min(2000).max(2100)),
+  rides: opt(z.int().min(0).max(2000)),
+  first: opt(z.int().min(0).max(2000)),
+  second: opt(z.int().min(0).max(2000)),
+  third: opt(z.int().min(0).max(2000)),
+  as_of_jst: opt(isoTime),
+  source_url: url.optional(),
+});
+
 export const feedSchema = z.object({
   schema_version: z.literal('1.0', { message: 'schema_version は "1.0" のみ対応しています' }),
   sample: z.boolean(),
@@ -158,6 +170,7 @@ export const feedSchema = z.object({
   collection_notes: z.array(str(2000)).max(500).optional(),
   races: z.array(raceSchema).max(300),
   track_conditions: z.array(trackSchema).max(100),
+  jockey_stats: z.array(jockeyStatSchema).max(500).optional(),
 });
 export type FeedFile = z.infer<typeof feedSchema>;
 
@@ -356,6 +369,51 @@ export function formatRange(p: Pick<WidePair, 'min' | 'max'>): string {
 /* ------------------------------------------------------------------ */
 /* Parse + structural checks (no stored data needed)                    */
 
+export interface FeedJockey {
+  key: string;
+  sample: boolean;
+  name: string;
+  year: number | null;
+  rides: number | null;
+  first: number | null;
+  second: number | null;
+  third: number | null;
+  asOf: string | null;
+  sourceUrl: string | null;
+  importedAt: string;
+}
+
+/** Jockey names are matched without spaces, apprentice marks (☆▲△◇★) or full-width forms. */
+export function normalizeJockeyName(name: string): string {
+  return name.normalize('NFKC').replace(/[\s\u3000]/g, '').replace(/^[★☆▲△◇◆]+/, '');
+}
+
+export function jockeyKey(sample: boolean, name: string): string {
+  return `${sample ? 'sample' : 'live'}|${normalizeJockeyName(name)}`;
+}
+
+/** 「2026年 騎乗512・1着70（勝率13.7%・複勝率37.5%）」; unknown parts stay unknown. */
+export function jockeyLine(j: FeedJockey): string {
+  const pct = (n: number | null) => (n === null || !j.rides ? '不明' : `${((n / j.rides) * 100).toFixed(1)}%`);
+  const top3 = j.first !== null && j.second !== null && j.third !== null ? j.first + j.second + j.third : null;
+  return `${j.year ?? '年不明'}年 騎乗${j.rides ?? '不明'}・1着${j.first ?? '不明'}（勝率${pct(j.first)}・複勝率${pct(top3)}）${j.asOf ? `${formatJst(j.asOf)}時点` : '時点不明'}`;
+}
+
+/** Keep the newer record; when either time is unknown, take the incoming one but keep known fields. */
+export function mergeJockey(existing: FeedJockey | undefined, incoming: FeedJockey): FeedJockey {
+  if (!existing) return incoming;
+  if (existing.asOf && incoming.asOf && Date.parse(incoming.asOf) < Date.parse(existing.asOf)) return existing;
+  return {
+    ...incoming,
+    year: incoming.year ?? existing.year,
+    rides: incoming.rides ?? existing.rides,
+    first: incoming.first ?? existing.first,
+    second: incoming.second ?? existing.second,
+    third: incoming.third ?? existing.third,
+    sourceUrl: incoming.sourceUrl ?? existing.sourceUrl,
+  };
+}
+
 export interface ParsedFeed {
   sample: boolean;
   checkedOn: string | null;
@@ -363,6 +421,7 @@ export interface ParsedFeed {
   notes: string[];
   races: FeedRace[];
   tracks: FeedTrack[];
+  jockeys: FeedJockey[];
   issues: FeedIssue[];
 }
 
@@ -583,7 +642,28 @@ export function parseFeed(value: unknown, importedAt: string): { ok: true; feed:
 
   return {
     ok: true,
-    feed: { sample: f.sample, checkedOn: f.checked_on_jst, description: f.description ?? null, notes: f.collection_notes ?? [], races, tracks, issues },
+    feed: {
+      sample: f.sample,
+      checkedOn: f.checked_on_jst,
+      description: f.description ?? null,
+      notes: f.collection_notes ?? [],
+      races,
+      tracks,
+      jockeys: (f.jockey_stats ?? []).map((j) => ({
+        key: jockeyKey(f.sample, j.name),
+        sample: f.sample,
+        name: j.name,
+        year: j.year ?? null,
+        rides: j.rides ?? null,
+        first: j.first ?? null,
+        second: j.second ?? null,
+        third: j.third ?? null,
+        asOf: j.as_of_jst ?? null,
+        sourceUrl: j.source_url ?? null,
+        importedAt,
+      })),
+      issues,
+    },
   };
 }
 

@@ -105,6 +105,31 @@ describe('checkResponse', () => {
   });
 });
 
+describe('checkResponse precision warnings', () => {
+  const s = realSnapshot();
+  const warnings = (r: ReturnType<typeof checkResponse>) => r.issues.filter((i) => i.level === 'warning').map((i) => i.message);
+
+  it('warns when one horse is in every bet (one failure loses everything)', () => {
+    const r = checkResponse(s, goodResponse(s));
+    expect(r.ok).toBe(true);
+    expect(warnings(r).some((m) => m.startsWith('全買い目が1番'))).toBe(true);
+    const spread = [
+      { type: 'win' as const, horseIds: ['h02'], amount: 1000, reason: '', odds: null, oddsAt: null },
+      { type: 'wide' as const, horseIds: ['h01', 'h03'], amount: 2000, reason: '', odds: null, oddsAt: null },
+    ];
+    expect(warnings(checkResponse(s, goodResponse(s, { bets: spread }))).some((m) => m.startsWith('全買い目が'))).toBe(false);
+  });
+
+  it('warns when a scenario does not rank every runner (scratched horses excluded)', () => {
+    const r = checkResponse(s, goodResponse(s));
+    expect(warnings(r)).toContain('条件「基本の想定」の順位に入っていない出走馬が6頭います（全頭の順位付けを依頼しています）');
+    const all = s.horses.filter((h) => !h.scratched).map((h) => h.id);
+    const res = goodResponse(s);
+    res.scenarios = res.scenarios.map((sc) => (sc.status === 'analyzed' ? { ...sc, order: all } : sc));
+    expect(warnings(checkResponse(s, res)).some((m) => m.includes('順位に入っていない'))).toBe(false);
+  });
+});
+
 describe('snapshot checks', () => {
   it('accepts the bundled sample-race.json (demo)', () => {
     expect(parseSnapshot(sample).ok).toBe(true);

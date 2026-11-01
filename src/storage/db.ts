@@ -2,10 +2,10 @@
 // one); settlements, note articles and draft images live in their own stores.
 import type { Draft } from '../domain/draft';
 import type { SavedAnalysis, Settlement } from '../domain/schema';
-import { mergeRace, mergeTrack, normalizeStoredRace, type FeedIssue, type FeedRace, type FeedTrack, type ParsedFeed } from '../domain/feed';
+import { mergeJockey, mergeRace, mergeTrack, normalizeStoredRace, type FeedIssue, type FeedJockey, type FeedRace, type FeedTrack, type ParsedFeed } from '../domain/feed';
 
 const DB_NAME = 'keiba-orbit';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 export interface StoredImage {
   id: string;
@@ -36,6 +36,7 @@ export function openDb(factory: IDBFactory = indexedDB): Promise<IDBDatabase> {
         db.createObjectStore('feedRaces', { keyPath: 'key' });
         db.createObjectStore('feedTracks', { keyPath: 'key' });
       }
+      if (e.oldVersion < 3) db.createObjectStore('feedJockeys', { keyPath: 'key' });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => {
@@ -144,7 +145,7 @@ export async function clearImages(): Promise<void> {
 
 export async function clearAll(): Promise<void> {
   const db = await openDb();
-  const names = ['analyses', 'settlements', 'drafts', 'images', 'feedRaces', 'feedTracks'];
+  const names = ['analyses', 'settlements', 'drafts', 'images', 'feedRaces', 'feedTracks', 'feedJockeys'];
   const tx = db.transaction(names, 'readwrite');
   names.forEach((n) => tx.objectStore(n).clear());
   await new Promise<void>((resolve, reject) => {
@@ -165,6 +166,10 @@ export async function getFeedRace(key: string): Promise<FeedRace | undefined> {
   return r ? normalizeStoredRace(r) : undefined;
 }
 
+export async function listFeedJockeys(): Promise<FeedJockey[]> {
+  return (await wrap((await store('feedJockeys', 'readonly')).getAll())) as FeedJockey[];
+}
+
 export async function listFeedTracks(): Promise<FeedTrack[]> {
   return (await wrap((await store('feedTracks', 'readonly')).getAll())) as FeedTrack[];
 }
@@ -176,16 +181,18 @@ export interface FeedApplyResult {
   pairs: number;
   mockPairs: number;
   tracks: number;
+  jockeys: number;
   issues: FeedIssue[];
 }
 
 /** Merge a parsed file into the stores in one transaction. Re-importing updates, never duplicates. */
 export async function applyFeed(feed: ParsedFeed): Promise<FeedApplyResult> {
   const db = await openDb();
-  const tx = db.transaction(['feedRaces', 'feedTracks'], 'readwrite');
+  const tx = db.transaction(['feedRaces', 'feedTracks', 'feedJockeys'], 'readwrite');
   const races = tx.objectStore('feedRaces');
   const tracks = tx.objectStore('feedTracks');
-  const result: FeedApplyResult = { added: 0, updated: 0, runners: 0, pairs: 0, mockPairs: 0, tracks: 0, issues: [...feed.issues] };
+  const jockeys = tx.objectStore('feedJockeys');
+  const result: FeedApplyResult = { added: 0, updated: 0, runners: 0, pairs: 0, mockPairs: 0, tracks: 0, jockeys: 0, issues: [...feed.issues] };
   for (const incoming of feed.races) {
     const stored = (await wrap(races.get(incoming.key))) as FeedRace | undefined;
     const existing = stored ? normalizeStoredRace(stored) : undefined;
@@ -203,6 +210,11 @@ export async function applyFeed(feed: ParsedFeed): Promise<FeedApplyResult> {
     tracks.put(mergeTrack(existing, incoming));
     result.tracks++;
   }
+  for (const incoming of feed.jockeys) {
+    const existing = (await wrap(jockeys.get(incoming.key))) as FeedJockey | undefined;
+    jockeys.put(mergeJockey(existing, incoming));
+    result.jockeys++;
+  }
   await new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
@@ -217,8 +229,8 @@ export async function deleteFeedRace(key: string): Promise<void> {
 /** Remove all sample (test) data, races and track conditions. */
 export async function clearSampleFeed(): Promise<void> {
   const db = await openDb();
-  const tx = db.transaction(['feedRaces', 'feedTracks'], 'readwrite');
-  for (const name of ['feedRaces', 'feedTracks']) {
+  const tx = db.transaction(['feedRaces', 'feedTracks', 'feedJockeys'], 'readwrite');
+  for (const name of ['feedRaces', 'feedTracks', 'feedJockeys']) {
     const s = tx.objectStore(name);
     const all = (await wrap(s.getAll())) as { key: string; sample: boolean }[];
     all.filter((x) => x.sample).forEach((x) => s.delete(x.key));

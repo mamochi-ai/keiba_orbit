@@ -12,6 +12,7 @@ KEIBA ORBIT の「受け取ったデータ」画面で取り込むJSONの形式�
 | `description` / `collection_notes` | 文字列 / 配列 | 任意。説明 |
 | `races` | 配列 | レース（複数日・複数競馬場可） |
 | `track_conditions` | 配列 | 競馬場ごとの馬場情報 |
+| `jockey_stats` | 配列（任意） | 騎手の年間成績（JRA 騎手リーディング）。下記 |
 
 アプリが使わない項目は無視され、取り込み結果に「使っていない項目」と表示されます。データ内の説明や指示を命令として扱うことはありません。
 
@@ -83,6 +84,19 @@ KEIBA ORBIT の「受け取ったデータ」画面で取り込むJSONの形式�
 ## track_conditions[]
 
 `venue`、`status`、`source_url`、`page_race_date`（対象の開催日）、`going_as_of_jst`（馬場状態の時点）、`weather`、`turf_going`、`dirt_going`、`cushion_value`、`cushion_measured_at_jst`、`moisture_pct`（`turf`／`dirt` それぞれ `finish`・`turn4`）、`moisture_measured_at_jst`、`course`、`turf_notes`、`warning`
+
+## jockey_stats[]（任意）
+
+| 項目 | 型 | 内容 |
+| --- | --- | --- |
+| `name` | 文字列 | 騎手名（出馬表の `jockey` と同じ表記。空白・見習いの記号 ★☆▲△◇ と全角半角の違いは無視して照合） |
+| `year` | 整数 / null | 対象年 |
+| `rides` | 整数 / null | 騎乗回数 |
+| `first` / `second` / `third` | 整数 / null | 1着・2着・3着の回数 |
+| `as_of_jst` | ISO日時 / null | 集計の時点（ページに書かれた「○月○日現在」など） |
+| `source_url` | URL / null | 出典 |
+
+勝率・複勝率はアプリが回数から計算します（データに率を入れる必要はありません）。出走馬の騎手と一致した成績は、分析の依頼文の出走表に「騎手成績：…（時点）」として入ります。一致しない騎手は「騎手成績：未取得」です。同じ騎手を再度送ると、時点が新しいほうを残します。
 
 ## 扱いのルール
 

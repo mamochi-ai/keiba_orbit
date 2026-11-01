@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
-import { FEED_STATE_LABEL, formatRange, matchTrack, parseFeed, trackSummary, unnumberedRunners, type FeedRace, type FeedTrack, type FeedWide } from '../domain/feed';
+import { FEED_STATE_LABEL, formatRange, jockeyKey, jockeyLine, matchTrack, parseFeed, trackSummary, unnumberedRunners, type FeedJockey, type FeedRace, type FeedTrack, type FeedWide } from '../domain/feed';
 import { feedRaceToDraft, pastRunLine } from '../domain/feedDraft';
 import { findJsonError } from '../domain/parse';
 import { formatDateJa, formatJst, nowIso } from '../domain/time';
-import { applyFeed, clearSampleFeed, deleteFeedRace, getFeedRace, listFeedRaces, listFeedTracks, type FeedApplyResult } from '../storage/db';
+import { applyFeed, clearSampleFeed, deleteFeedRace, getFeedRace, listFeedJockeys, listFeedRaces, listFeedTracks, type FeedApplyResult } from '../storage/db';
 import { navigate, useApp } from '../state';
 import { EmptyState, Icon, SafeLink } from '../ui/common';
 
@@ -183,7 +183,7 @@ function ImportSummary({ result, sample }: { result: FeedApplyResult; sample: bo
           {sample && '（テストデータとして保存。予想や収支には使いません）'}
         </p>
         <p>
-          レース：新規 {result.added}件・更新 {result.updated}件／出走馬 {result.runners}頭／ワイド {result.pairs}組
+          レース：新規 {result.added}件・更新 {result.updated}件／出走馬 {result.runners}頭／ワイド {result.pairs}組{result.jockeys > 0 && `／騎手成績 ${result.jockeys}人`}
           {result.mockPairs > 0 && `＋仮オッズ ${result.mockPairs}組`}／馬場情報 {result.tracks}件
         </p>
       </div>
@@ -297,6 +297,7 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
   const { draft, setDraft } = useApp();
   const [race, setRace] = useState<FeedRace | null | undefined>(undefined);
   const [tracks, setTracks] = useState<FeedTrack[]>([]);
+  const [jockeys, setJockeys] = useState<FeedJockey[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -304,9 +305,11 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
       try {
         const r = await getFeedRace(fkey);
         const t = await listFeedTracks();
+        const js = await listFeedJockeys().catch(() => []);
         if (!alive) return;
         setRace(r ?? null);
         setTracks(t);
+        setJockeys(js);
       } catch {
         if (alive) setRace(null);
       }
@@ -345,13 +348,13 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
 
   const match = matchTrack(tracks, race);
   const unnumbered = unnumberedRunners(race).length;
-  const { notes } = feedRaceToDraft(race, tracks);
+  const { notes } = feedRaceToDraft(race, tracks, jockeys);
   const w = race.wide;
 
   function start() {
     const hasWork = Boolean(draft.name || draft.horses.length || draft.copied);
     if (hasWork && !window.confirm('作業中の内容を、このレースの内容で置き換えますか？（保存済みの分析は消えません）')) return;
-    setDraft(feedRaceToDraft(race!, tracks).draft);
+    setDraft(feedRaceToDraft(race!, tracks, jockeys).draft);
     navigate('/prepare');
   }
 
@@ -424,6 +427,12 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
                     当日馬体重 {r.bodyWeightKg ? `${r.bodyWeightKg}kg${r.bodyWeightDiffKg !== null && r.bodyWeightDiffKg !== undefined ? `（${r.bodyWeightDiffKg > 0 ? '+' : r.bodyWeightDiffKg === 0 ? '±' : ''}${r.bodyWeightDiffKg}）` : ''}` : '未取得'}
                     {(r.sire || r.damSire) && `／父 ${r.sire ?? '?'}・母の父 ${r.damSire ?? '?'}`}
                     {r.trainer && `／${r.trainer}${r.trainerAffiliation ? `（${r.trainerAffiliation}）` : ''}`}
+                  </span>
+                  <span className="hint" style={{ display: 'block', margin: 0 }}>
+                    騎手成績：{(() => {
+                      const j = r.jockey ? jockeys.find((x) => x.key === jockeyKey(race.sample, r.jockey!)) : undefined;
+                      return j ? jockeyLine(j) : '未取得';
+                    })()}
                   </span>
                   {(r.pastRuns?.length ?? 0) > 0 && (
                     <details className="past-runs">
