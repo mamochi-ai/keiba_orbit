@@ -378,17 +378,25 @@ await rp.goto(base + '#/feed');
 await rp.getByLabel('受け取りデータ（JSON）').fill(JSON.stringify(liveFeed));
 await rp.getByRole('button', { name: '取り込む', exact: true }).click();
 await rp.locator('.ok-box').first().waitFor();
+// Received races are grouped by day, newest first; past days are folded.
+const day = rp.locator('section:has(#feed-live) details.race-day', { hasText: '2026年11月1日' });
+check('feed: races grouped by race day; a past day is folded', (await day.count()) === 1 && (await day.getAttribute('open')) === null && (await day.locator('summary').innerText()).includes('結果1件'));
+await day.locator('summary').click();
 await rp.locator('section:has(#feed-live) .saved-item a', { hasText: 'テスト記念' }).click();
 await rp.getByRole('heading', { name: /テスト記念/ }).waitFor();
 check('feed race: result and race-day weight shown', (await rp.getByRole('heading', { name: 'レース結果' }).isVisible()) && (await rp.locator('.feed-runner').first().innerText()).includes('482kg'));
 await rp.getByRole('button', { name: 'このレースで分析を準備' }).click();
 await rp.waitForURL(/prepare/);
+const budgetSel = rp.getByLabel('このレースの予算（上限）');
+check('prep: per-race budget choice (default 30,000)', (await budgetSel.inputValue()) === '30000');
+await budgetSel.selectOption('5000');
 await rp.getByLabel('分析対象と情報締切を確認しました').check();
 await rp.getByRole('button', { name: '分析用コピー' }).click();
 await rp.waitForSelector('text=コピーしました');
 const rprompt = await rp.evaluate(() => navigator.clipboard.readText());
 const rsnap = JSON.parse(rprompt.slice(rprompt.indexOf('【入力】') + 4));
 check('prompt: jockey season stats passed with time; unknown jockeys say 未取得', rprompt.includes('騎手成績：2026年 騎乗400・1着60（勝率15.0%・複勝率37.5%）') && rprompt.includes('騎手成績：未取得'));
+check('prompt: budget 5,000 and loss rules passed', rsnap.budget === 5000 && rprompt.includes('損失を抑えるための追加ルール'));
 check('prompt: precision rules (全出走馬・人気との差・乗り替わり)', rprompt.includes('全出走馬（出走取消を除く）を評価する') && rprompt.includes('【人気との差】') && rprompt.includes('乗り替わり'));
 const rresp = {
   schemaVersion: 1, raceId: rsnap.race.id, snapshotId: rsnap.snapshotId, isDemo: false, status: 'provisional', summary: '【推測】h01を中心に。',
@@ -396,7 +404,7 @@ const rresp = {
   scenarios: [{ id: 'base', status: 'analyzed', order: ['h01', 'h04'], reason: 'x' }],
   // 3 runners after the scratch: JRA sells no ワイド, so 単勝 only.
   bets: [{ type: 'win', horseIds: ['h01'], amount: 1000, reason: '', odds: null, oddsAt: null }, { type: 'win', horseIds: ['h02'], amount: 1000, reason: '', odds: null, oddsAt: null }],
-  budget: 30000, spent: 2000, unspent: 28000, maxLoss: 2000, calculation: { executed: false, method: '' }, limitations: [], reviewTriggers: [], sourceIds: [],
+  budget: 5000, spent: 2000, unspent: 3000, maxLoss: 2000, calculation: { executed: false, method: '' }, limitations: [], reviewTriggers: [], sourceIds: [],
 };
 await rp.getByRole('button', { name: '結果を貼り付け' }).click();
 await rp.getByLabel(/Claudeの応答/).fill(JSON.stringify(rresp));

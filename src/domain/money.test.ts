@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeTotals, estimateBet, estimatePayout, floorTo100, payoutPer100, sharedHorseDependencies } from './money';
+import { computeTotals, estimateBet, estimatePayout, floorTo100, payoutPer100, sharedHorseDependencies, shortfallBets } from './money';
 import { realSnapshot } from '../test/fixtures';
 
 describe('money', () => {
@@ -42,5 +42,16 @@ describe('money', () => {
       { type: 'wide', horseIds: ['a', 'c'], amount: 3000, reason: '', odds: null, oddsAt: null },
     ]);
     expect(deps[0]).toEqual({ horseId: 'a', betIndexes: [0, 1, 2], amount: 10000 });
+  });
+
+  it('finds bets that lose money even as the only hit (トリガミ), from recorded odds only', () => {
+    const s = realSnapshot(); // win 1 = 3.2, wide 1-2 = 2.1〜2.8
+    const bet = (type: 'win' | 'wide', horseIds: string[], amount: number) => ({ type, horseIds, amount, reason: '', odds: null, oddsAt: null });
+    // spent 3,000: wide 1-2 ¥1,000 pays ¥2,100〜¥2,800 → always short; win ¥2,000 pays ¥6,400 → fine
+    expect(shortfallBets(s, [bet('win', ['h01'], 2000), bet('wide', ['h01', 'h02'], 1000)])).toEqual([{ betIndex: 1, level: 'sure', min: 2100, max: 2800 }]);
+    // wide ¥1,300 pays ¥2,730〜¥3,640 against ¥3,000 → depends on the final odds
+    expect(shortfallBets(s, [bet('win', ['h01'], 1700), bet('wide', ['h01', 'h02'], 1300)])).toEqual([{ betIndex: 1, level: 'maybe', min: 2730, max: 3640 }]);
+    // no odds recorded for 単勝 3番 → not judged
+    expect(shortfallBets(s, [bet('win', ['h03'], 100), bet('win', ['h01'], 2900)])).toEqual([]);
   });
 });

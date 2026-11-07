@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { emptyDraft } from '../domain/draft';
 import { clearAll } from '../storage/db';
-import { DEFAULT_CLAUDE_URL, isClaudeUrl, useApp } from '../state';
+import { BUDGET_CHOICES, DEFAULT_CLAUDE_URL, isClaudeUrl, useApp } from '../state';
 import { CopyGuide } from '../ui/CopyGuide';
 
 const SOURCES: { item: string; state: string; how: string }[] = [
@@ -60,6 +60,27 @@ export function SettingsScreen() {
           </section>
 
           <ClaudeTarget />
+
+          <section className="sec" aria-labelledby="budget-default">
+            <div className="sec-head">
+              <span className="tag">Budget</span>
+              <h2 id="budget-default" className="sec-title">
+                1レースの予算（初期値）
+              </h2>
+            </div>
+            <p className="muted">受け取ったデータからレースを選んだときの予算です。分析準備の画面で、レースごとに変えられます。</p>
+            <label>
+              初期値
+              <select value={settings.defaultBudget} onChange={(e) => setSettings({ ...settings, defaultBudget: Number(e.target.value) })}>
+                {BUDGET_CHOICES.map((v) => (
+                  <option key={v} value={v}>
+                    {v.toLocaleString('ja-JP')}円
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="hint">外れることは避けられないので、1レースの金額を小さくしておくと負けが積み重なりにくくなります。予算はClaudeが配分する上限で、使い切る必要はありません。</p>
+          </section>
 
           <section className="sec" aria-labelledby="ds">
             <div className="sec-head">

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
 import { FEED_STATE_LABEL, formatRange, jockeyKey, jockeyLine, matchTrack, parseFeed, trackSummary, unnumberedRunners, type FeedJockey, type FeedRace, type FeedTrack, type FeedWide } from '../domain/feed';
 import { feedRaceToDraft, pastRunLine } from '../domain/feedDraft';
 import { findJsonError } from '../domain/parse';
-import { formatDateJa, formatJst, nowIso } from '../domain/time';
+import { formatDateJa, formatJst, nowIso, todayJst } from '../domain/time';
 import { applyFeed, clearSampleFeed, deleteFeedRace, getFeedRace, listFeedJockeys, listFeedRaces, listFeedTracks, type FeedApplyResult } from '../storage/db';
 import { navigate, useApp } from '../state';
 import { EmptyState, Icon, SafeLink } from '../ui/common';
@@ -137,7 +137,7 @@ export function Feed() {
             <p className="muted">データを受け取ったら、上の「取り込む」から読み込んでください。</p>
           </EmptyState>
         ) : (
-          <RaceList races={live} />
+          <RaceDays races={live} />
         )}
         <TrackList tracks={tracks.filter((t) => !t.sample)} />
       </section>
@@ -237,6 +237,38 @@ function oddsBadge(w: FeedWide | null) {
   return <span className={`badge ${w.retained ? 'warn' : 'ok'}`}>ワイド {w.pairs.length}組{w.retained ? '（前回の値）' : ''}</span>;
 }
 
+/**
+ * Received races grouped by race day, newest day first. Today and later are open; past days are
+ * folded (kept, not deleted: their official results feed the 振り返り totals).
+ */
+function RaceDays({ races }: { races: FeedRace[] }) {
+  const today = todayJst();
+  const days = [...new Set(races.map((r) => r.date))].sort((a, b) => b.localeCompare(a));
+  return (
+    <div className="race-days">
+      {days.map((d) => {
+        const list = races.filter((r) => r.date === d);
+        const results = list.filter((r) => r.result).length;
+        const venues = [...new Set(list.map((r) => r.venue))].join('・');
+        return (
+          <details key={d} className="race-day" open={d >= today}>
+            <summary>
+              <span className="race-day-title">
+                {formatDateJa(d)}
+                {d === today ? <span className="badge ok">今日</span> : d < today ? <span className="badge">終了</span> : null}
+              </span>
+              <span className="hint">
+                {venues}　{list.length}レース{results ? `・結果${results}件` : ''}
+              </span>
+            </summary>
+            <RaceList races={list} />
+          </details>
+        );
+      })}
+    </div>
+  );
+}
+
 function RaceList({ races }: { races: FeedRace[] }) {
   return (
     <ul className="saved-list">
@@ -294,7 +326,7 @@ function TrackList({ tracks }: { tracks: FeedTrack[] }) {
 /* ------------------------------------------------------------------ */
 
 export function FeedRaceView({ fkey }: { fkey: string }) {
-  const { draft, setDraft } = useApp();
+  const { draft, setDraft, settings } = useApp();
   const [race, setRace] = useState<FeedRace | null | undefined>(undefined);
   const [tracks, setTracks] = useState<FeedTrack[]>([]);
   const [jockeys, setJockeys] = useState<FeedJockey[]>([]);
@@ -354,7 +386,7 @@ export function FeedRaceView({ fkey }: { fkey: string }) {
   function start() {
     const hasWork = Boolean(draft.name || draft.horses.length || draft.copied);
     if (hasWork && !window.confirm('作業中の内容を、このレースの内容で置き換えますか？（保存済みの分析は消えません）')) return;
-    setDraft(feedRaceToDraft(race!, tracks, jockeys).draft);
+    setDraft({ ...feedRaceToDraft(race!, tracks, jockeys).draft, budget: settings.defaultBudget });
     navigate('/prepare');
   }
 

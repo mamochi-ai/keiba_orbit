@@ -120,6 +120,17 @@ describe('checkResponse precision warnings', () => {
     expect(warnings(checkResponse(s, goodResponse(s, { bets: spread }))).some((m) => m.startsWith('全買い目が'))).toBe(false);
   });
 
+  it('warns (not errors) about a bet that loses money even when it is the only hit', () => {
+    const bets = [
+      { type: 'win' as const, horseIds: ['h01'], amount: 2000, reason: '', odds: null, oddsAt: null },
+      { type: 'wide' as const, horseIds: ['h01', 'h02'], amount: 1000, reason: '', odds: null, oddsAt: null },
+    ];
+    const r = checkResponse(s, goodResponse(s, { bets }));
+    expect(r.ok).toBe(true);
+    expect(warnings(r)).toContain('ワイド 1-2は、この買い目だけ当たっても払戻（目安¥2,100〜¥2,800）が使う金額¥3,000を下回ります（当たっても赤字）');
+    expect(warnings(checkResponse(s, goodResponse(s))).some((m) => m.includes('赤字'))).toBe(false);
+  });
+
   it('warns when a scenario does not rank every runner (scratched horses excluded)', () => {
     const r = checkResponse(s, goodResponse(s));
     expect(warnings(r)).toContain('条件「基本の想定」の順位に入っていない出走馬が6頭います（全頭の順位付けを依頼しています）');

@@ -8,6 +8,11 @@
 ・騎手：前走からの乗り替わりの有無（過去成績の騎手と比較）と、その評価を書く。騎手の成績を根拠にするときは、数値と時点・出典IDを示す。成績が未取得なら未取得と書く。
 ・買い目は、特定の1頭が4着以下になっただけで全部外れる構成にしない（例：その馬を含まない組み合わせや別の馬の単勝を混ぜる）。そうできない理由があれば limitations に書く。
 ・同じ馬を含む買い目の合計額と、その馬が崩れた場合に外れる金額を limitations に書く。
+損失を抑えるための追加ルール（外れること自体は避けられない前提で、無駄な負けを減らす）：
+・その買い目だけ当たっても、払戻（入力のオッズ×金額）が合計の使用額を下回る買い目（当たっても赤字）は入れない。オッズに幅がある場合は下限で判断する。入れる場合は理由を limitations に書く。オッズ未取得なら判断できないと書く。
+・金額は根拠の強さに合わせて控えめにする。中心候補の直近成績に未取得（海外・地方戦など）が多い、評価上位の差が小さい、当日の馬場やオッズが未取得、といった場合は総額を減らすか見送る。予算を使い切る必要はない。
+・点数を増やしすぎない。点数を増やすほど当たっても赤字になりやすいことを考慮する。
+・limitations の最初に、使う総額を決めた理由（根拠の強さ・データの欠け）を1文で書く。
 以下のJSON構造に従ってJSONのみ返す。不明な数値はnull。文字列内はエスケープ。schemaVersion=1。入力race.id、snapshotIdをそのまま返す。
 {"schemaVersion":1,"raceId":"...","snapshotId":"...","isDemo":false,"status":"provisional|ready|insufficient","summary":"...","horses":[{"id":"...","reasons":[],"concerns":[],"sourceIds":[]}],"scenarios":[{"id":"base|wet|fast","status":"analyzed|insufficient","order":[],"reason":"..."}],"bets":[{"type":"win|wide","horseIds":[],"amount":100,"reason":"...","odds":null,"oddsAt":null}],"budget":30000,"spent":0,"unspent":30000,"maxLoss":0,"calculation":{"executed":false,"method":"..."},"limitations":[],"reviewTriggers":[],"sourceIds":[]}
 【入力】

@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, type KeyboardEvent } from 'react';
-import { computeTotals, estimateBet, formatYen, sharedHorseDependencies, type PayoutEstimate } from '../domain/money';
+import { computeTotals, estimateBet, formatYen, sharedHorseDependencies, shortfallBets, type PayoutEstimate } from '../domain/money';
 import { SCENARIO_IDS, SCENARIO_LABELS, type AnalysisResponse, type Bet, type RaceSnapshot, type ScenarioId } from '../domain/schema';
 import { horseLabel } from '../domain/validate';
 import { formatJst } from '../domain/time';
@@ -272,6 +272,7 @@ const BAR_COLORS = ['var(--cyan)', 'var(--purple)', '#80aef8', '#5fc9b8', '#c9b3
 export function BudgetPanel({ snapshot, response }: { snapshot: RaceSnapshot; response: AnalysisResponse }) {
   const totals = computeTotals(snapshot.budget, response.bets);
   const deps = sharedHorseDependencies(response.bets);
+  const shortfall = shortfallBets(snapshot, response.bets);
   const noOdds = response.bets.some((b) => estimateBet(snapshot, b).kind === 'none');
   const tentative = noOdds || response.status !== 'ready';
   const mismatch = response.spent !== totals.spent || response.unspent !== totals.unspent || response.maxLoss !== totals.maxLoss;
@@ -325,12 +326,22 @@ export function BudgetPanel({ snapshot, response }: { snapshot: RaceSnapshot; re
               <span className="bet-amount">{formatYen(b.amount)}</span>
               <span className="bet-reason">{b.reason ? humanizeIds(b.reason, snapshot) : '理由の記載なし'}</span>
               <PayoutLine estimate={estimateBet(snapshot, b)} spent={totals.spent} />
+              {shortfall.some((f) => f.betIndex === i) && (
+                <span className="payout warn-text">
+                  {shortfall.find((f) => f.betIndex === i)!.level === 'sure' ? '⚠ この買い目だけ当たっても赤字（トリガミ）' : '⚠ オッズ次第で、この買い目だけ当たっても赤字'}
+                </span>
+              )}
             </li>
           ))}
         </ul>
       )}
-      {deps.length > 0 && (
+      {(deps.length > 0 || shortfall.length > 0) && (
         <div className="risk">
+          {shortfall.length > 0 && (
+            <p>
+              <Icon name="warning" size={16} /> 当たっても赤字になりうる買い目が{shortfall.length}点あります。点数を減らすか、その買い目の金額を見直す材料にしてください。
+            </p>
+          )}
           {deps.map((d) => (
             <p key={d.horseId}>
               <Icon name="warning" size={16} /> {horseLabel(snapshot, d.horseId)}に{d.betIndexes.length}点（{formatYen(d.amount)}）が依存。この馬が崩れると同時に外れます。
@@ -375,6 +386,8 @@ export function Verdict({ snapshot, response }: { snapshot: RaceSnapshot; respon
   else if (!snapshot.odds || it?.odds?.status === 'missing') cautions.push('オッズ未取得：配分は候補');
   if (it?.track?.status !== 'ok' || /参考・過去情報/.test(it?.track?.text ?? '')) cautions.push('当日の馬場は未取得（参考情報のみ）');
   if (allOnOne) cautions.push(`全買い目が${horseLabel(snapshot, allOnOne.horseId)}に依存`);
+  const shortfallCount = shortfallBets(snapshot, response.bets).filter((f) => f.level === 'sure').length;
+  if (shortfallCount) cautions.push(`当たっても赤字の買い目が${shortfallCount}点`);
 
   return (
     <div className="verdict">

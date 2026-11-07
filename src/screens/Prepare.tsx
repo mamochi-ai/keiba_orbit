@@ -5,7 +5,7 @@ import { ITEM_KEYS, ITEM_LABELS, ITEM_TEXT_LIMITS, isSafeHttpUrl, type ItemKey, 
 import { parseSnapshot } from '../domain/validate';
 import { formatDateJa, formatJst, isoToJstLocal, jstLocalToIso, nowIso } from '../domain/time';
 import { fetchWeather, WEATHER_PROVIDER } from '../data/weather';
-import { DEFAULT_CLAUDE_URL, navigate, useApp } from '../state';
+import { BUDGET_CHOICES, DEFAULT_CLAUDE_URL, navigate, useApp } from '../state';
 import { CopyButton, EmptyState, Icon, OpenClaudeLink, SafeLink, StatusBadge } from '../ui/common';
 import { CardImport } from './CardImport';
 import { CopyGuide } from '../ui/CopyGuide';
@@ -135,6 +135,22 @@ export function Prepare() {
                         onChange={(e) => setDraft((d) => ({ ...d, cutoffLocal: e.target.value, confirmed: false }))}
                       />
                     </span>
+                  </label>
+                  <label>
+                    このレースの予算（上限）
+                    <select
+                      value={draft.budget}
+                      onChange={(e) => setDraft((d) => ({ ...d, budget: Number(e.target.value), confirmed: false }))}
+                    >
+                      {[...new Set([...BUDGET_CHOICES, draft.budget])]
+                        .sort((a, b) => a - b)
+                        .map((v) => (
+                          <option key={v} value={v}>
+                            {v.toLocaleString('ja-JP')}円
+                          </option>
+                        ))}
+                    </select>
+                    <span className="hint">Claudeはこの金額を上限に配分します（使い切る必要はありません）。自信がないレースは少なめに。</span>
                   </label>
                   <label className="check">
                     <input type="checkbox" checked={draft.confirmed} onChange={(e) => setDraft((d) => ({ ...d, confirmed: e.target.checked }))} />

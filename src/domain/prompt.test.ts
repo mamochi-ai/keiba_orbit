@@ -20,6 +20,9 @@ describe('prompts', () => {
     expect(p).toContain('乗り替わり');
     expect(p).toContain('特定の1頭が4着以下になっただけで全部外れる構成にしない');
     expect(p.indexOf('精度を上げるための追加ルール')).toBeLessThan(p.indexOf('以下のJSON構造に従ってJSONのみ返す。'));
+    expect(p).toContain('当たっても赤字');
+    expect(p).toContain('予算を使い切る必要はない');
+    expect(p.indexOf('損失を抑えるための追加ルール')).toBeLessThan(p.indexOf('以下のJSON構造に従ってJSONのみ返す。'));
   });
 
   it('note prompt ends exactly with the footer and nothing after it', () => {
