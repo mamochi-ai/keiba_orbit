@@ -8,7 +8,7 @@ import {
   type AnalysisResponse,
   type RaceSnapshot,
 } from './schema';
-import { activeRunners, computeTotals, findOdds, isValidStake, type Totals } from './money';
+import { activeRunners, computeTotals, findOdds, formatYen, isValidStake, shortfallBets, type Totals } from './money';
 
 export interface Issue {
   level: 'error' | 'warning';
@@ -163,6 +163,20 @@ export function checkResponse(snapshot: RaceSnapshot, value: unknown): ResponseC
   if (res.bets.length >= 2) {
     const inAll = snapshot.horses.find((h) => res.bets.every((b) => b.horseIds.includes(h.id)));
     if (inAll) issues.push(warning(`全買い目が${horseLabel(snapshot, inAll.id)}を含んでいます。この馬が崩れると全部外れます`));
+  }
+  // A hit that still loses money overall (トリガミ), judged from recorded odds only.
+  for (const f of shortfallBets(snapshot, res.bets)) {
+    const b = res.bets[f.betIndex]!;
+    const nums = b.horseIds.map((id) => snapshot.horses.find((h) => h.id === id)?.number ?? '?').join('-');
+    const label = `${b.type === 'win' ? '単勝' : 'ワイド'} ${nums}`;
+    const pay = f.min === f.max ? formatYen(f.min) : `${formatYen(f.min)}〜${formatYen(f.max)}`;
+    issues.push(
+      warning(
+        f.level === 'sure'
+          ? `${label}は、この買い目だけ当たっても払戻（目安${pay}）が使う金額${formatYen(totals.spent)}を下回ります（当たっても赤字）`
+          : `${label}は、オッズ次第でこの買い目だけ当たっても赤字になります（払戻目安${pay}／使う金額${formatYen(totals.spent)}）`,
+      ),
+    );
   }
   const runnersIds = snapshot.horses.filter((h) => !h.scratched).map((h) => h.id);
   for (const sc of res.scenarios) {

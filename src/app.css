@@ -473,3 +473,15 @@ input::-webkit-date-and-time-value { min-height: 24px; line-height: 24px; }
 .ftag.fact { background: var(--cyan-deep); color: var(--cyan); }
 .ftag.guess { background: var(--purple-deep); color: var(--purple); }
 @media (max-width: 767px) { .verdict { padding: 14px 14px 12px; } .verdict-no { font-size: 46px; } }
+
+/* Received races grouped by race day */
+.race-days { display: grid; gap: 0; }
+.race-day { border-top: 1px solid var(--line); }
+.race-day:first-child { border-top: 0; }
+.race-day > summary { min-height: 52px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; cursor: pointer; font-weight: 700; }
+.race-day-title { display: inline-flex; align-items: center; gap: 8px; }
+.race-day[open] > summary { margin-bottom: 4px; }
+.race-day > summary { list-style: none; }
+.race-day > summary::-webkit-details-marker { display: none; }
+.race-day > summary::after { content: '▸'; color: var(--muted); margin-left: auto; }
+.race-day[open] > summary::after { content: '▾'; }

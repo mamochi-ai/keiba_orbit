@@ -94,3 +94,28 @@ export function sharedHorseDependencies(bets: Bet[]): { horseId: string; betInde
     }))
     .sort((a, b) => b.betIndexes.length - a.betIndexes.length);
 }
+
+export interface ShortfallBet {
+  betIndex: number;
+  /** 'sure': even the top of the odds range pays less than the total spent; 'maybe': only the bottom does. */
+  level: 'sure' | 'maybe';
+  min: number;
+  max: number;
+}
+
+/**
+ * Bets that return less than the total spent even when they are the only hit (トリガミ).
+ * Uses only odds recorded in the snapshot; bets without odds (or with deferred estimates) are skipped.
+ */
+export function shortfallBets(snapshot: RaceSnapshot, bets: Bet[]): ShortfallBet[] {
+  const spent = computeTotals(snapshot.budget, bets).spent;
+  const out: ShortfallBet[] = [];
+  bets.forEach((b, i) => {
+    const e = estimateBet(snapshot, b);
+    const [min, max] = e.kind === 'fixed' ? [e.payout, e.payout] : e.kind === 'range' ? [e.min, e.max] : [null, null];
+    if (min === null || max === null) return;
+    if (max < spent) out.push({ betIndex: i, level: 'sure', min, max });
+    else if (min < spent) out.push({ betIndex: i, level: 'maybe', min, max });
+  });
+  return out;
+}
