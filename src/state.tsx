@@ -9,6 +9,8 @@ export interface Settings {
   claudeUrl: string;
   /** Budget a new race starts with (100-yen units, up to 30,000). */
   defaultBudget: number;
+  /** Ask Claude to spend the whole budget (one race a day); off = it may keep some or pass. */
+  spendAll: boolean;
 }
 
 /** Quick choices for a race budget; smaller amounts keep losses small. */
@@ -27,7 +29,7 @@ export function isClaudeUrl(value: string): boolean {
 }
 
 const SETTINGS_KEY = 'keiba-orbit:settings';
-const defaultSettings: Settings = { weatherEnabled: true, claudeUrl: DEFAULT_CLAUDE_URL, defaultBudget: 30000 };
+const defaultSettings: Settings = { weatherEnabled: true, claudeUrl: DEFAULT_CLAUDE_URL, defaultBudget: 30000, spendAll: true };
 
 function readSettings(): Settings {
   try {
@@ -41,6 +43,7 @@ function readSettings(): Settings {
         typeof v.defaultBudget === 'number' && Number.isInteger(v.defaultBudget) && v.defaultBudget >= 100 && v.defaultBudget <= 30000 && v.defaultBudget % 100 === 0
           ? v.defaultBudget
           : 30000,
+      spendAll: typeof v.spendAll === 'boolean' ? v.spendAll : true,
     };
   } catch {
     return defaultSettings;

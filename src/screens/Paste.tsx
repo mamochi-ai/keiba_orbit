@@ -11,7 +11,7 @@ import { CopyButton, EmptyState, Icon } from '../ui/common';
 import { betLabel, PayoutLine, STATUS_LABELS } from './reportParts';
 
 export function Paste() {
-  const { draft, setDraft } = useApp();
+  const { draft, setDraft, settings } = useApp();
   // A long reply can arrive in several messages: part 1, then each 「続き」.
   const [parts, setParts] = useState<string[]>(['']);
   const joined = parts.length > 1 ? joinParts(parts) : null;
@@ -53,7 +53,7 @@ export function Paste() {
       return;
     }
     setParseError(null);
-    setCheck(checkResponse(snapshot!, p.value));
+    setCheck(checkResponse(snapshot!, p.value, { spendAll: settings.spendAll }));
   }
 
   async function save() {

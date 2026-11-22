@@ -79,7 +79,15 @@ export function SettingsScreen() {
                 ))}
               </select>
             </label>
-            <p className="hint">外れることは避けられないので、1レースの金額を小さくしておくと負けが積み重なりにくくなります。予算はClaudeが配分する上限で、使い切る必要はありません。</p>
+            <label className="check mt">
+              <input type="checkbox" checked={settings.spendAll} onChange={(e) => setSettings({ ...settings, spendAll: e.target.checked })} />
+              予算を全額使う（1日1レースに絞る使い方）
+            </label>
+            <p className="hint">
+              オン：Claudeは予算を全額配分します（データ不足で分析できない場合を除く）。根拠の強い買い目に厚く配分し、当たっても赤字の買い目は入れません。
+              <br />
+              オフ：予算は上限で、根拠が弱いときは減額や見送りをします。1日に何レースも買う場合はこちらが向いています。
+            </p>
           </section>
 
           <section className="sec" aria-labelledby="ds">

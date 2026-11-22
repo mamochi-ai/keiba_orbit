@@ -85,7 +85,7 @@ export interface ResponseCheck {
   totals: Totals | null;
 }
 
-export function checkResponse(snapshot: RaceSnapshot, value: unknown): ResponseCheck {
+export function checkResponse(snapshot: RaceSnapshot, value: unknown, opts: { spendAll?: boolean } = {}): ResponseCheck {
   const r = analysisResponseSchema.safeParse(value);
   if (!r.success) return { ok: false, response: null, issues: formatZodIssues(r.error).map(error), totals: null };
   const res = r.data;
@@ -185,6 +185,9 @@ export function checkResponse(snapshot: RaceSnapshot, value: unknown): ResponseC
     if (missing.length) issues.push(warning(`条件「${SCENARIO_LABELS[sc.id]}」の順位に入っていない出走馬が${missing.length}頭います（全頭の順位付けを依頼しています）`));
   }
 
+  if (opts.spendAll && res.status !== 'insufficient' && totals.unspent > 0) {
+    issues.push(warning(`「予算を全額使う」設定ですが、${formatYen(totals.unspent)}が残っています（使う金額${formatYen(totals.spent)}／予算${formatYen(snapshot.budget)}）`));
+  }
   if (res.bets.length === 0) {
     issues.push(warning(res.status === 'ready' ? '分析は ready ですが配分が空です（購入なしの判断として扱います）' : '配分は空です'));
   }
