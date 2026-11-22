@@ -25,6 +25,19 @@ describe('prompts', () => {
     expect(p.indexOf('損失を抑えるための追加ルール')).toBeLessThan(p.indexOf('以下のJSON構造に従ってJSONのみ返す。'));
   });
 
+  it('budget policy: flexible by default, full budget when asked (no placeholder left)', () => {
+    const s = realSnapshot();
+    const flex = buildAnalysisPrompt(s);
+    const all = buildAnalysisPrompt(s, { spendAll: true });
+    for (const p of [flex, all]) expect(p).not.toContain('{{BUDGET_POLICY}}');
+    expect(flex).toContain('全額使用を強制しない');
+    expect(flex).not.toContain('全額配分し、残さない');
+    expect(all).toContain('予算（budget）を全額配分し、残さない');
+    expect(all).not.toContain('予算を使い切る必要はない');
+    expect(all).toContain('当たっても赤字');
+    expect(all.indexOf('全額を使うときのルール')).toBeLessThan(all.indexOf('以下のJSON構造に従ってJSONのみ返す。'));
+  });
+
   it('note prompt ends exactly with the footer and nothing after it', () => {
     const s = realSnapshot();
     const saved: SavedAnalysis = {

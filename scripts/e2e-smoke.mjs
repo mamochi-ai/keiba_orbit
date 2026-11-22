@@ -396,7 +396,7 @@ await rp.waitForSelector('text=コピーしました');
 const rprompt = await rp.evaluate(() => navigator.clipboard.readText());
 const rsnap = JSON.parse(rprompt.slice(rprompt.indexOf('【入力】') + 4));
 check('prompt: jockey season stats passed with time; unknown jockeys say 未取得', rprompt.includes('騎手成績：2026年 騎乗400・1着60（勝率15.0%・複勝率37.5%）') && rprompt.includes('騎手成績：未取得'));
-check('prompt: budget 5,000 and loss rules passed', rsnap.budget === 5000 && rprompt.includes('損失を抑えるための追加ルール'));
+check('prompt: budget 5,000 and full-budget rules passed (default on)', rsnap.budget === 5000 && rprompt.includes('全額配分し、残さない') && !rprompt.includes('予算を使い切る必要はない'));
 check('prompt: precision rules (全出走馬・人気との差・乗り替わり)', rprompt.includes('全出走馬（出走取消を除く）を評価する') && rprompt.includes('【人気との差】') && rprompt.includes('乗り替わり'));
 const rresp = {
   schemaVersion: 1, raceId: rsnap.race.id, snapshotId: rsnap.snapshotId, isDemo: false, status: 'provisional', summary: '【推測】h01を中心に。',

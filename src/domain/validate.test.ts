@@ -131,6 +131,13 @@ describe('checkResponse precision warnings', () => {
     expect(warnings(checkResponse(s, goodResponse(s))).some((m) => m.includes('赤字'))).toBe(false);
   });
 
+  it('warns when the full budget was asked for but some is left (not for insufficient)', () => {
+    const msg = (r: ReturnType<typeof checkResponse>) => warnings(r).find((m) => m.includes('全額使う'));
+    expect(msg(checkResponse(s, goodResponse(s), { spendAll: true }))).toBe('「予算を全額使う」設定ですが、¥27,000が残っています（使う金額¥3,000／予算¥30,000）');
+    expect(msg(checkResponse(s, goodResponse(s)))).toBeUndefined();
+    expect(msg(checkResponse(s, goodResponse(s, { status: 'insufficient' }), { spendAll: true }))).toBeUndefined();
+  });
+
   it('warns when a scenario does not rank every runner (scratched horses excluded)', () => {
     const r = checkResponse(s, goodResponse(s));
     expect(warnings(r)).toContain('条件「基本の想定」の順位に入っていない出走馬が6頭います（全頭の順位付けを依頼しています）');

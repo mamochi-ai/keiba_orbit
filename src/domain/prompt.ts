@@ -2,6 +2,8 @@
 // tell Claude that the embedded data is untrusted and not instructions.
 import analysisTemplate from '../templates/analysis-prompt.txt?raw';
 import noteTemplate from '../templates/note-article-prompt.txt?raw';
+import budgetPolicyFlex from '../templates/budget-policy-flex.txt?raw';
+import budgetPolicyAll from '../templates/budget-policy-all.txt?raw';
 import noteFooter from '../templates/note-format-footer.txt?raw';
 import type { RaceSnapshot, SavedAnalysis } from './schema';
 import { computeTotals, estimateBet } from './money';
@@ -14,8 +16,14 @@ function fill(template: string, placeholder: string, json: string): string {
   return template.replace(placeholder, () => json);
 }
 
-export function buildAnalysisPrompt(snapshot: RaceSnapshot): string {
-  return fill(analysisTemplate, '{{RACE_SNAPSHOT_JSON}}', JSON.stringify(snapshot, null, 2));
+export interface PromptOptions {
+  /** Spend the whole budget on this race (the user buys one race a day). */
+  spendAll?: boolean;
+}
+
+export function buildAnalysisPrompt(snapshot: RaceSnapshot, opts: PromptOptions = {}): string {
+  const policy = (opts.spendAll ? budgetPolicyAll : budgetPolicyFlex).trim();
+  return fill(fill(analysisTemplate, '{{BUDGET_POLICY}}', policy), '{{RACE_SNAPSHOT_JSON}}', JSON.stringify(snapshot, null, 2));
 }
 
 /** The confirmed report handed to Claude for the note article. Only already-validated values. */

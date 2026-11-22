@@ -20,7 +20,7 @@ const HINTS: Record<ItemKey, string> = {
 };
 
 export function Prepare() {
-  const { draft, setDraft, images, settings } = useApp();
+  const { draft, setDraft, images, settings, setSettings } = useApp();
   const homeErrors = validateHome(draft);
   const snapshotRef = useRef<RaceSnapshot | null>(null);
   // Bumped after the 出馬表 import so the item editors re-read the draft.
@@ -56,7 +56,7 @@ export function Prepare() {
     const r = parseSnapshot(snap);
     if (!r.ok) throw new Error(`分析用データに問題があります：${r.issues.map((i) => i.message).join(' / ')}`);
     snapshotRef.current = r.snapshot;
-    return buildAnalysisPrompt(r.snapshot);
+    return buildAnalysisPrompt(r.snapshot, { spendAll: settings.spendAll });
   }
 
   // Which step of the Claude round trip the user is on (only for emphasis; nothing is automated).
@@ -150,7 +150,13 @@ export function Prepare() {
                           </option>
                         ))}
                     </select>
-                    <span className="hint">Claudeはこの金額を上限に配分します（使い切る必要はありません）。自信がないレースは少なめに。</span>
+                    <span className="hint">
+                      {settings.spendAll ? 'Claudeはこの金額を全額配分します。' : 'Claudeはこの金額を上限に配分します（使い切る必要はありません）。'}
+                    </span>
+                  </label>
+                  <label className="check">
+                    <input type="checkbox" checked={settings.spendAll} onChange={(e) => setSettings({ ...settings, spendAll: e.target.checked })} />
+                    予算を全額使う（1日1レースに絞る使い方）
                   </label>
                   <label className="check">
                     <input type="checkbox" checked={draft.confirmed} onChange={(e) => setDraft((d) => ({ ...d, confirmed: e.target.checked }))} />
